@@ -5,16 +5,17 @@
 ### High-Level Architecture
 
 ```
-┌─────────────────┐
-│  Cisco IP Phone │
-└────────┬────────┘
-         │ HTTP/HTTPS
-         │ (XML Directory)
-         ▼
+┌─────────────────┐      ┌──────────────┐
+│  Cisco IP Phone │      │ Web Browser  │
+└────────┬────────┘      └──────┬───────┘
+         │ HTTP/HTTPS            │ HTTP/HTTPS
+         │ (XML Directory)        │ (Web Frontend)
+         │                        │
+         ▼                        ▼
 ┌─────────────────────────────────────┐
 │      Web Application                 │
 │  ┌───────────────────────────────┐  │
-│  │   Web Server (Flask/FastAPI)  │  │
+│  │   Web Server (FastAPI)        │  │
 │  └───────────┬───────────────────┘  │
 │              │                       │
 │  ┌───────────▼───────────────────┐  │
@@ -22,6 +23,8 @@
 │  │  - XML Directory Endpoint      │  │
 │  │  - Search API Endpoint         │  │
 │  │  - Sync Management Endpoint    │  │
+│  │  - Web Frontend Routes         │  │
+│  │  - OAuth Setup Routes          │  │
 │  └───────────┬───────────────────┘  │
 │              │                       │
 │  ┌───────────▼───────────────────┐  │
@@ -41,8 +44,9 @@
                │
                ▼
 ┌─────────────────────────────────────┐
-│         Database                    │
+│         SQLite Database             │
 │  - Contacts Table                   │
+│  - Phone Numbers Table              │
 │  - Sync State Table                 │
 └─────────────────────────────────────┘
 
@@ -73,19 +77,31 @@
   - Error handling and logging
 
 ### 2. API Layer
-- **Endpoints**:
-  - `GET /directory.xml` - Cisco IP Phone XML directory
+- **Cisco IP Phone Directory Endpoints**:
+  - `GET /directory` - Main directory menu with group options
+  - `GET /directory/groups/<group>` - Contact list for a specific group
+  - `GET /directory/contacts/<id>` - Individual contact phone numbers
+  - `GET /directory/help` - Help information (optional)
+- **Search and API Endpoints**:
   - `GET /api/search?phone=<number>` - Phone number search
+  - `GET /api/contacts` - API endpoint for frontend search (full-text)
   - `POST /api/sync` - Trigger manual sync
   - `GET /api/status` - Application and sync status
+- **Web Frontend Endpoints**:
+  - `GET /` - Web frontend home page
+  - `GET /auth/google` - Initiate OAuth flow
+  - `GET /auth/callback` - OAuth callback handler
 
-### 3. Business Logic Layer
+### 3. Business Logic Layer (Application Services)
+
+The Business Logic Layer contains application services that implement the core business rules and orchestrate operations. These services coordinate between the API layer and the data access layer.
 
 #### Contact Service
 - **Responsibilities**:
   - Retrieve contacts from database
   - Format contacts for display
   - Handle contact data transformations
+  - Provide contact data to various consumers (XML formatter, web frontend, API)
 
 #### Sync Service
 - **Responsibilities**:
@@ -93,18 +109,27 @@
   - Handle sync token management
   - Coordinate with Google API client
   - Update local database
+  - Track sync status and errors
 
 #### XML Formatter
 - **Responsibilities**:
-  - Convert contact data to Cisco XML format
-  - Handle pagination if needed
+  - Generate main directory menu (`CiscoIPPhoneMenu`) with group options
+  - Generate directory groups menu (`CiscoIPPhoneMenu`) filtered by group
+  - Generate individual contact directory (`CiscoIPPhoneDirectory`) with phone numbers
+  - Map contact names to groups (2ABC, 3DEF, etc.)
+  - Handle pagination if needed for large groups
   - Format names and phone numbers appropriately
+  - Escape special characters and XML entities
+  - Generate XML structure compliant with Cisco IP Phone specifications
+  - Build RESTful URLs for menu items (`/directory/groups/<group>`, `/directory/contacts/<id>`)
 
 #### Search Service
 - **Responsibilities**:
   - Normalize phone number queries
-  - Search database for matching contacts
+  - Perform full-text search on contact names
+  - Search database for matching contacts by phone number
   - Return formatted search results
+  - Handle search result ranking and relevance
 
 ### 4. Data Access Layer
 
@@ -116,17 +141,36 @@
 
 #### Sync State Repository
 - **Responsibilities**:
-  - Store and retrieve sync tokens
+  - Store and retrieve sync tokens (tokens returned by Google API for incremental sync)
   - Track last sync timestamp
-  - Manage sync status
+  - Manage sync status (idle, syncing, error)
+  - Store sync error messages
+  - The SyncState entity represents the current state of synchronization with Google Contacts, including the token needed for incremental updates
 
-### 5. Google Contacts Integration
+### 5. Web Frontend
+
+#### Frontend Interface
+- **Responsibilities**:
+  - Provide beautiful, user-friendly interface for viewing contacts
+  - Display contact directory with search capabilities
+  - Handle OAuth 2.0 setup flow
+  - Display sync status and manage sync operations
+  - Full-text search interface for names and phone numbers
+
+#### OAuth Setup Interface
+- **Responsibilities**:
+  - Initiate Google OAuth 2.0 flow
+  - Handle OAuth callback
+  - Display OAuth setup status
+  - Manage token refresh using Google's web OAuth flow
+
+### 6. Google Contacts Integration
 
 #### OAuth Client
 - **Responsibilities**:
   - Handle OAuth 2.0 flow
   - Manage authorization tokens
-  - Refresh expired tokens
+  - Refresh expired tokens using Google's web OAuth mechanism
 
 #### API Client
 - **Responsibilities**:
@@ -213,13 +257,34 @@ SyncState:
 6. Handle 410 error (token expired) by doing full sync
 ```
 
-### XML Directory Request Flow
+### Cisco IP Phone Directory Request Flow
+
+#### Main Directory Menu
 ```
-1. Cisco IP Phone requests /directory.xml
-2. Web Server routes to XML Directory endpoint
-3. Contact Service retrieves all active contacts
-4. XML Formatter converts contacts to Cisco XML
-5. Response sent to phone
+1. Cisco IP Phone requests /directory
+2. Web Server routes to main directory endpoint
+3. XML Formatter generates CiscoIPPhoneMenu with index menu items
+4. Response sent to phone
+```
+
+#### Directory Groups Request
+```
+1. User selects group (e.g., "2ABC") on phone
+2. Phone requests /directory/groups/2ABC
+3. Web Server routes to groups endpoint
+4. Contact Service filters contacts by group
+5. XML Formatter generates CiscoIPPhoneMenu with contact names
+6. Response sent to phone
+```
+
+#### Individual Contact Request
+```
+1. User selects contact on phone
+2. Phone requests /directory/contacts/<id>
+3. Web Server routes to contacts endpoint
+4. Contact Service retrieves contact by id
+5. XML Formatter generates CiscoIPPhoneDirectory with phone numbers
+6. Response sent to phone
 ```
 
 ### Search Request Flow
@@ -231,12 +296,33 @@ SyncState:
 5. Results formatted and returned as JSON
 ```
 
+### Web Frontend Request Flow
+```
+1. User accesses web frontend (GET /)
+2. Web Server serves frontend HTML
+3. Frontend makes API calls to /api/contacts for search
+4. Search Service performs full-text search
+5. Results displayed in web interface
+```
+
+### OAuth Setup Flow
+```
+1. User accesses OAuth setup page
+2. User clicks "Connect Google Account"
+3. Application redirects to Google OAuth consent screen
+4. User grants permissions
+5. Google redirects back with authorization code
+6. Application exchanges code for tokens
+7. Tokens stored securely
+8. User redirected to main interface
+```
+
 ## Security Architecture
 
 ### Authentication
 - OAuth 2.0 for Google API access
-- Token storage: Encrypted at rest
-- Token refresh: Automatic with retry logic
+- Token storage: Secure file-based storage
+- Token refresh: Automatic with retry logic using Google's web OAuth flow
 
 ### API Security
 - API endpoints protected with authentication (API keys or OAuth)
@@ -245,8 +331,8 @@ SyncState:
 
 ### Data Security
 - HTTPS for all external communication
-- Encrypted database storage
 - Secure credential management (environment variables, secrets manager)
+- SQLite database file permissions restricted
 
 ## Deployment Architecture
 
@@ -256,18 +342,18 @@ SyncState:
 - Direct Google API access
 
 ### Production Environment
-- Web server (Gunicorn/uWSGI with Flask/FastAPI)
-- PostgreSQL or similar database
-- Reverse proxy (Nginx)
+- Web server (Uvicorn with FastAPI)
+- SQLite database
+- Reverse proxy (Nginx) - optional
 - SSL/TLS certificates
 - Environment-based configuration
 
 ## Scalability Considerations
 
-### Horizontal Scaling
-- Stateless application design
-- Shared database
-- Load balancer for multiple instances
+### Single-User Design
+- Application designed for single-user use
+- SQLite database sufficient for up to 10,000 contacts
+- No horizontal scaling required
 
 ### Performance Optimization
 - Database indexing (especially on phone numbers)

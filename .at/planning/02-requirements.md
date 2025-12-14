@@ -11,7 +11,7 @@
 ### FR2: Contact Download and Storage
 - **FR2.1**: Application must download all contacts from the authenticated Google account
 - **FR2.2**: Application must handle pagination for large contact lists
-- **FR2.3**: Application must store contact data locally (database or file system)
+- **FR2.3**: Application must store contact data locally in a SQLite database
 - **FR2.4**: Application must preserve all relevant contact fields (name, phone numbers, email addresses, etc.)
 - **FR2.5**: Application must support incremental sync using sync tokens
 - **FR2.6**: Application must handle deleted contacts during sync
@@ -39,20 +39,28 @@
 - **FR5.4**: Application must update local database with changes from Google
 - **FR5.5**: Application must mark deleted contacts appropriately
 
+### FR6: Web Frontend
+- **FR6.1**: Application must provide a beautiful, human-usable web interface for viewing the directory
+- **FR6.2**: Web frontend must support full-text search by contact names
+- **FR6.3**: Web frontend must support full-text search by phone numbers
+- **FR6.4**: Web frontend must provide OAuth 2.0 setup interface using Google's web OAuth flow
+- **FR6.5**: Web frontend must handle OAuth token refresh using Google's web OAuth token refresh mechanism
+- **FR6.6**: Web frontend must display contact information in a user-friendly format
+- **FR6.7**: Web frontend must be separate from the Cisco IP Phone XML directory endpoint
+
 ## Non-Functional Requirements
 
 ### NFR1: Performance
 - **NFR1.1**: Initial contact download should complete within reasonable time (< 5 minutes for 10,000 contacts)
-- **NFR1.2**: XML directory endpoint should respond within 500ms
-- **NFR1.3**: Search API should respond within 200ms for typical queries
+- **NFR1.2**: XML directory endpoint should respond within 100ms
+- **NFR1.3**: Search API should respond within 250ms for typical queries
 - **NFR1.4**: Application should handle at least 100 concurrent requests
 
 ### NFR2: Security
-- **NFR2.1**: OAuth tokens must be stored securely (encrypted at rest)
-- **NFR2.2**: API endpoints should be protected with authentication/authorization
-- **NFR2.3**: All network communication must use HTTPS
-- **NFR2.4**: Contact data must be stored securely
-- **NFR2.5**: Application must not log sensitive contact information
+- **NFR2.1**: API endpoints should be protected with authentication/authorization
+- **NFR2.2**: All network communication must use HTTPS
+- **NFR2.3**: Contact data must be stored securely
+- **NFR2.4**: Application must not log sensitive contact information
 
 ### NFR3: Reliability
 - **NFR3.1**: Application must handle Google API rate limits gracefully
@@ -62,9 +70,9 @@
 - **NFR3.5**: Application must log errors for debugging and monitoring
 
 ### NFR4: Scalability
-- **NFR4.1**: Application must handle contact lists with 100,000+ contacts
-- **NFR4.2**: Database queries must be optimized for large datasets
-- **NFR4.3**: Application should support horizontal scaling if needed
+- **NFR4.1**: Application must handle contact lists with up to 10,000 contacts
+- **NFR4.2**: Database queries must be optimized for efficient search
+- **NFR4.3**: Application is designed for single-user use and does not require horizontal scaling
 
 ### NFR5: Usability
 - **NFR5.1**: XML directory must be accessible via simple HTTP GET request

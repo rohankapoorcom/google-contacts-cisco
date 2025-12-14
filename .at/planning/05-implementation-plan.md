@@ -38,6 +38,14 @@ google_contacts_cisco/
 ├── auth/                   # Authentication
 │   ├── __init__.py
 │   └── oauth.py
+├── templates/              # Frontend templates
+│   ├── base.html
+│   ├── index.html
+│   ├── oauth_setup.html
+│   └── contacts.html
+├── static/                 # Static files (CSS, JS)
+│   ├── css/
+│   └── js/
 └── utils/                  # Utilities
     ├── __init__.py
     ├── phone_normalizer.py
@@ -45,7 +53,7 @@ google_contacts_cisco/
 ```
 
 ### 1.3 Database Setup
-- [ ] Choose database (SQLite for dev, PostgreSQL for prod)
+- [ ] Set up SQLite database
 - [ ] Set up SQLAlchemy
 - [ ] Create database models
 - [ ] Set up Alembic for migrations
@@ -117,14 +125,20 @@ google_contacts_cisco/
 
 ### 4.2 XML Formatter Implementation
 - [ ] Create XML formatter service
-- [ ] Implement contact to XML conversion
+- [ ] Implement main directory menu generation (`CiscoIPPhoneMenu`)
+- [ ] Implement directory groups menu generation (`CiscoIPPhoneMenu`)
+- [ ] Implement individual contact directory generation (`CiscoIPPhoneDirectory`)
+- [ ] Implement contact name to group mapping logic
 - [ ] Handle name formatting
 - [ ] Handle phone number formatting
 - [ ] Handle multiple phone numbers per contact
+- [ ] Build RESTful URLs for menu items
 - [ ] Test XML output format
 
-### 4.3 XML Directory Endpoint
-- [ ] Create `/directory.xml` endpoint
+### 4.3 XML Directory Endpoints
+- [ ] Create `GET /directory` endpoint (main menu)
+- [ ] Create `GET /directory/groups/<group>` endpoint (group contacts)
+- [ ] Create `GET /directory/contacts/<id>` endpoint (individual contact)
 - [ ] Retrieve contacts from database
 - [ ] Format as XML
 - [ ] Set proper content-type headers
@@ -147,33 +161,62 @@ google_contacts_cisco/
 
 ### 5.3 Search Service Implementation
 - [ ] Create search service
-- [ ] Implement exact match search
-- [ ] Implement partial match search
+- [ ] Implement full-text search for contact names
+- [ ] Implement phone number search (exact and partial match)
+- [ ] Normalize phone numbers for search
 - [ ] Handle multiple results
 - [ ] Format search results
+- [ ] Optimize search queries for performance
 
 ### 5.4 Search API Endpoint
-- [ ] Create `/api/search` endpoint
+- [ ] Create `/api/search` endpoint for phone number search
+- [ ] Create `/api/contacts` endpoint for full-text search (names and phone numbers)
 - [ ] Implement query parameter handling
 - [ ] Add input validation
 - [ ] Return JSON response
 - [ ] Add error handling
-- [ ] Document API endpoint
+- [ ] Document API endpoints
 
-## Phase 6: Web Interface (Optional - Week 6)
+## Phase 6: Web Frontend (Week 6)
 
-### 6.1 Basic Web Interface
-- [ ] Create simple HTML interface
+### 6.1 Frontend Framework Setup
+- [ ] Choose frontend approach (server-side templates or SPA)
+- [ ] Set up frontend build tools if needed
+- [ ] Create base HTML templates
+- [ ] Set up CSS framework (e.g., Tailwind CSS, Bootstrap)
+- [ ] Create responsive layout
+
+### 6.2 OAuth Setup Interface
+- [ ] Create OAuth setup page
+- [ ] Implement Google OAuth 2.0 initiation
+- [ ] Handle OAuth callback
+- [ ] Display OAuth connection status
+- [ ] Implement token refresh using Google's web OAuth flow
+- [ ] Add error handling for OAuth failures
+
+### 6.3 Contact Directory Interface
+- [ ] Create beautiful contact directory page
+- [ ] Display contact list with pagination
+- [ ] Add contact detail view
+- [ ] Implement responsive design
+- [ ] Add loading states and error handling
+
+### 6.4 Full-Text Search Interface
+- [ ] Create search input component
+- [ ] Implement real-time search (debounced)
+- [ ] Display search results
+- [ ] Support search by name
+- [ ] Support search by phone number
+- [ ] Highlight search matches
+- [ ] Handle empty search results
+
+### 6.5 Sync Management Interface
 - [ ] Display sync status
+- [ ] Show last sync timestamp
+- [ ] Add manual sync trigger button
+- [ ] Display sync progress
+- [ ] Show sync errors if any
 - [ ] Display contact count
-- [ ] Add manual sync trigger
-- [ ] Add search interface
-
-### 6.2 Admin Interface (Optional)
-- [ ] Create admin dashboard
-- [ ] Display sync history
-- [ ] Display error logs
-- [ ] Add configuration management
 
 ## Phase 7: Testing (Week 7)
 
@@ -227,11 +270,12 @@ google_contacts_cisco/
 ## Implementation Priorities
 
 ### Must Have (MVP)
-1. OAuth 2.0 authentication
+1. OAuth 2.0 authentication with web interface
 2. Full contact sync
 3. Cisco XML directory endpoint
 4. Phone number search API
-5. Basic error handling
+5. Web frontend with full-text search
+6. Basic error handling
 
 ### Should Have
 1. Incremental sync

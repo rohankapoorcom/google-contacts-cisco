@@ -9,39 +9,29 @@
   - Rich ecosystem
 
 ### Web Framework
-- **FastAPI** (recommended) or **Flask**
-  - FastAPI advantages:
-    - Built-in async support
-    - Automatic API documentation (OpenAPI/Swagger)
-    - Type validation with Pydantic
-    - High performance
-  - Flask advantages:
-    - Simpler, more lightweight
-    - Large community and ecosystem
-    - Good for smaller applications
+- **FastAPI**
+  - Built-in async support
+  - Automatic API documentation (OpenAPI/Swagger)
+  - Type validation with Pydantic
+  - High performance
+  - Modern Python async/await support
 
 ### Database
-- **PostgreSQL** (production) or **SQLite** (development)
-  - PostgreSQL advantages:
-    - Robust, production-ready
-    - Advanced indexing capabilities
-    - Full-text search support
-    - ACID compliance
-  - SQLite advantages:
-    - Zero configuration
-    - Good for development and small deployments
-    - File-based, easy to backup
+- **SQLite**
+  - Zero configuration
+  - Lightweight and fast for single-user applications
+  - File-based, easy to backup
+  - Sufficient for up to 10,000 contacts
+  - ACID compliant
+  - Good indexing support for search operations
 
 ### ORM/Database Library
-- **SQLAlchemy** (recommended) or **SQLModel**
-  - SQLAlchemy:
-    - Mature, feature-rich
-    - Excellent documentation
-    - Supports both SQLAlchemy Core and ORM
-  - SQLModel:
-    - Built on SQLAlchemy and Pydantic
-    - Type-safe models
-    - Modern approach
+- **SQLAlchemy**
+  - Mature, feature-rich
+  - Excellent documentation
+  - Supports both SQLAlchemy Core and ORM
+  - Works seamlessly with SQLite
+  - Full-text search support
 
 ## Google API Integration
 
@@ -61,29 +51,30 @@
 ## XML Generation
 
 ### XML Libraries
-- **lxml** or **xml.etree.ElementTree** (built-in)
-  - lxml: More features, better performance
-  - ElementTree: Built-in, simpler, sufficient for basic needs
+- **lxml**
+  - More features than built-in ElementTree
+  - Better performance
+  - Robust XML generation and parsing
+  - XPath support if needed
 
 ## HTTP Client
 
-### Async HTTP (if using FastAPI)
-- **httpx** or **aiohttp**
+### Async HTTP
+- **aiohttp**
   - Async HTTP client for Google API calls
   - Better performance for concurrent requests
-
-### Sync HTTP (if using Flask)
-- **requests**
-  - Simple, synchronous HTTP client
-  - Well-established library
+  - Works well with FastAPI's async architecture
+  - Efficient for I/O-bound operations
 
 ## Data Validation
 
 ### Validation Library
-- **Pydantic** (if using FastAPI) or **marshmallow** (if using Flask)
+- **Pydantic**
   - Type validation
   - Data serialization/deserialization
   - Schema definition
+  - Integrated with FastAPI
+  - Type-safe models
 
 ## Configuration Management
 
@@ -93,9 +84,10 @@
   - Secure credential management
 
 ### Configuration
-- **pydantic-settings** (FastAPI) or **python-decouple** (Flask)
+- **pydantic-settings**
   - Type-safe configuration
   - Environment-based settings
+  - Integrated with Pydantic and FastAPI
 
 ## Testing
 
@@ -151,11 +143,12 @@
 
 ## Deployment
 
-### WSGI/ASGI Server
-- **Gunicorn** (Flask) or **Uvicorn** (FastAPI)
-  - Production WSGI/ASGI server
+### ASGI Server
+- **Uvicorn**
+  - Production ASGI server for FastAPI
   - Process management
   - Worker configuration
+  - High performance async server
 
 ### Reverse Proxy
 - **Nginx**
@@ -196,14 +189,17 @@
 ## Development Tools
 
 ### Development Server
-- **uvicorn** (FastAPI) or **Flask development server**
-  - Hot reload
+- **uvicorn**
+  - Hot reload with --reload flag
   - Debug mode
+  - Fast development iteration
 
 ### API Documentation
-- **FastAPI automatic docs** or **Swagger UI**
-  - Interactive API documentation
+- **FastAPI automatic docs**
+  - Interactive API documentation at /docs
+  - Swagger UI integration
   - Testing interface
+  - ReDoc alternative at /redoc
 
 ## Phone Number Handling
 
@@ -226,17 +222,21 @@ pydantic-settings>=2.1.0
 # Database
 sqlalchemy>=2.0.0
 alembic>=1.12.0
-psycopg2-binary>=2.9.9  # PostgreSQL adapter
 
 # Google API
 google-api-python-client>=2.100.0
 google-auth>=2.25.0
 google-auth-oauthlib>=1.1.0
 
+# XML
+lxml>=5.0.0
+
+# HTTP Client
+aiohttp>=3.9.0
+
 # Utilities
 python-dotenv>=1.0.0
 phonenumbers>=8.13.0
-httpx>=0.25.0  # For async HTTP if needed
 
 # Testing
 pytest>=7.4.0
@@ -253,24 +253,45 @@ ruff>=0.1.6  # Fast linter
 
 ## Technology Decision Rationale
 
-### Why FastAPI over Flask?
+### Why FastAPI?
 - Built-in async support (better for I/O-bound operations like API calls)
 - Automatic API documentation
 - Type safety with Pydantic
 - Modern Python features
 - High performance
+- Excellent for single-user web applications
 
-### Why PostgreSQL over MongoDB?
-- Structured data (contacts have consistent schema)
-- ACID compliance for data integrity
-- Better for relational queries (phone number search)
-- SQL is well-suited for this use case
-- Easier to index phone numbers efficiently
+### Why SQLite?
+- Zero configuration - perfect for single-user application
+- Lightweight and fast for up to 10,000 contacts
+- File-based storage - easy to backup and manage
+- ACID compliant for data integrity
+- Good indexing support for search operations
+- No separate database server required
 
 ### Why SQLAlchemy?
 - Mature and stable
 - Excellent documentation
 - Supports both simple and complex queries
-- Database-agnostic (can switch from SQLite to PostgreSQL easily)
+- Works seamlessly with SQLite
+- Full-text search support for contact names
 - Migration support with Alembic
+
+### Why lxml?
+- Better performance than built-in ElementTree
+- More robust XML generation
+- Better for generating Cisco XML format
+- XPath support if needed for complex XML operations
+
+### Why aiohttp?
+- Async HTTP client works well with FastAPI
+- Efficient for I/O-bound Google API calls
+- Better performance than synchronous requests
+- Supports connection pooling
+
+### Why Pydantic?
+- Integrated with FastAPI
+- Type-safe models and validation
+- Automatic API schema generation
+- Excellent for request/response validation
 
