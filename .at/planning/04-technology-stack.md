@@ -186,6 +186,65 @@
   - Centralized logging
   - Log analysis
 
+## Frontend Framework
+
+### JavaScript Framework
+- **Vue 3** ⭐
+  - Reactive component framework
+  - Composition API with `<script setup>` syntax
+  - Modern, maintainable architecture
+  - Excellent TypeScript support
+  - **ALL FRONTEND TASKS MUST USE VUE 3**
+
+### Build Tool
+- **Vite**
+  - Lightning-fast HMR (Hot Module Replacement)
+  - Optimized production builds
+  - Native ES modules
+  - Plugin ecosystem
+
+### Language
+- **TypeScript** ⭐
+  - Type safety for frontend code
+  - Better IDE support and autocomplete
+  - Catch errors at compile time
+  - Self-documenting code
+  - **ALL FRONTEND CODE MUST USE TYPESCRIPT**
+
+### CSS Framework
+- **Tailwind CSS**
+  - Utility-first CSS framework
+  - Rapid UI development
+  - Responsive design built-in
+  - Small production bundle
+
+### HTTP Client
+- **Axios**
+  - Promise-based HTTP client
+  - Request/response interceptors
+  - TypeScript support
+  - Automatic JSON transformation
+
+### Router
+- **Vue Router 4**
+  - Client-side routing
+  - Nested routes
+  - Navigation guards
+  - TypeScript support
+
+### State Management (Optional)
+- **Pinia**
+  - Vue 3 state management
+  - TypeScript support
+  - Devtools integration
+  - Simple API
+
+### Frontend Package Manager
+- **npm** or **pnpm**
+  - Fast, reliable package management
+  - Workspace support
+  - Lock file for reproducibility
+
 ## Development Tools
 
 ### Development Server
@@ -212,6 +271,7 @@
 
 ## Recommended Package Versions
 
+### Backend (Python)
 ```txt
 # Core
 fastapi>=0.104.0
@@ -241,25 +301,83 @@ phonenumbers>=8.13.0
 # Testing
 pytest>=7.4.0
 pytest-cov>=4.1.0
-pytest-asyncio>=0.21.0  # If using async
+pytest-asyncio>=0.21.0
 pytest-mock>=3.12.0
-httpx-mock>=0.7.0  # For mocking HTTP
+pytest-playwright>=0.4.3  # For E2E tests
+httpx-mock>=0.7.0
 
 # Code Quality
 black>=23.11.0
 mypy>=1.7.0
-ruff>=0.1.6  # Fast linter
+ruff>=0.1.6
+```
+
+### Frontend (JavaScript/TypeScript)
+```json
+{
+  "dependencies": {
+    "vue": "^3.3.0",
+    "vue-router": "^4.2.0",
+    "axios": "^1.6.0",
+    "pinia": "^2.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.5.0",
+    "vite": "^5.0.0",
+    "typescript": "^5.3.0",
+    "vue-tsc": "^1.8.0",
+    "@types/node": "^20.10.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0"
+  }
+}
 ```
 
 ## Technology Decision Rationale
 
+### Why Vue 3? ⭐
+- **Reactive and Modern**: Composition API provides better code organization than React hooks
+- **TypeScript Support**: First-class TypeScript integration
+- **Performance**: Virtual DOM with optimized reactivity system
+- **Developer Experience**: Excellent tooling, Vue Devtools, and instant HMR with Vite
+- **Component-Based**: Reusable, testable, maintainable components
+- **Gentle Learning Curve**: Easier to learn and use than React for this project scope
+- **Small Bundle Size**: ~30KB min+gzip vs React's ~40KB
+- **Official Ecosystem**: Vue Router and Pinia provide cohesive, well-maintained tools
+
+### Why Vite?
+- **Lightning-Fast HMR**: Instant hot module replacement for rapid development
+- **Optimized Builds**: Rollup-based production builds with tree-shaking
+- **ES Modules**: Native browser ES modules in development (no bundling!)
+- **TypeScript**: Out-of-the-box TypeScript support, no configuration needed
+- **Plugin Ecosystem**: Rich plugin system for Vue, React, etc.
+- **Modern**: Built for modern web development, not legacy browsers
+
+### Why TypeScript for Frontend? ⭐
+- **Type Safety**: Catch errors at compile time, not in production
+- **Better IDE Support**: Autocomplete, refactoring, go-to-definition
+- **Self-Documenting**: Types serve as always-up-to-date inline documentation
+- **Maintainability**: Easier to refactor and maintain over time
+- **API Contracts**: Ensures frontend matches backend API schemas (Pydantic models)
+- **Team Scalability**: Makes code more predictable for multiple developers
+
+### Why Tailwind CSS?
+- **Rapid Development**: Utility classes enable fast UI iteration
+- **Consistent Design**: Built-in design system with spacing, colors, typography
+- **Responsive**: Mobile-first responsive design utilities (sm:, md:, lg:)
+- **Small Production**: PurgeCSS removes unused styles automatically
+- **Customizable**: Easy to theme and extend via tailwind.config.js
+- **No CSS Conflicts**: Utility classes eliminate specificity wars
+
 ### Why FastAPI?
 - Built-in async support (better for I/O-bound operations like API calls)
-- Automatic API documentation
-- Type safety with Pydantic
-- Modern Python features
-- High performance
+- Automatic API documentation (OpenAPI/Swagger)
+- Type safety with Pydantic (matches TypeScript on frontend)
+- Modern Python features (async/await, type hints)
+- High performance (comparable to Node.js, Go)
 - Excellent for single-user web applications
+- **Works great with Vue**: Clean REST API for Vue/Axios to consume
 
 ### Why SQLite?
 - Zero configuration - perfect for single-user application
