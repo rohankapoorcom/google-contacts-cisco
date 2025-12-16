@@ -15,3 +15,10 @@ def test_version_string():
     expected = ".".join(map(str, __version_info__))
     assert __version__ == expected
 
+
+def test_version_format():
+    """Test version string follows semantic versioning format."""
+    parts = __version__.split(".")
+    assert len(parts) == 3, "Version must be in format X.Y.Z"
+    assert all(part.isdigit() for part in parts), "All version parts must be numeric"
+
