@@ -1,4 +1,5 @@
 """Test main application."""
+
 import pytest
 from httpx import AsyncClient, ASGITransport
 
@@ -33,4 +34,3 @@ def test_version():
     assert __version__ is not None
     assert isinstance(__version__, str)
     assert len(__version__.split(".")) == 3  # Major.Minor.Patch
-

@@ -1,4 +1,5 @@
 """Test version information."""
+
 from google_contacts_cisco._version import __version__, __version_info__
 
 
@@ -21,4 +22,3 @@ def test_version_format():
     parts = __version__.split(".")
     assert len(parts) == 3, "Version must be in format X.Y.Z"
     assert all(part.isdigit() for part in parts), "All version parts must be numeric"
-
