@@ -1,23 +1,31 @@
 """Test main application."""
-from fastapi.testclient import TestClient
+import pytest
+from httpx import AsyncClient, ASGITransport
+
 from google_contacts_cisco.main import app
 from google_contacts_cisco._version import __version__
 
-client = TestClient(app)
 
-
-def test_root():
+@pytest.mark.asyncio
+async def test_root():
     """Test root endpoint."""
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json() == {"message": "Google Contacts Cisco Directory API"}
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/")
+        assert response.status_code == 200
+        assert response.json() == {"message": "Google Contacts Cisco Directory API"}
 
 
-def test_health():
+@pytest.mark.asyncio
+async def test_health():
     """Test health check endpoint."""
-    response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "healthy"}
 
 
 def test_version():
