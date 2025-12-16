@@ -1,4 +1,6 @@
-"""Google Contacts Cisco integration package."""
+"""Google Contacts Cisco IP Phone Integration."""
 
-__version__ = "0.1.0"
+from ._version import __version__, __version_info__
+
+__all__ = ["__version__", "__version_info__"]
 

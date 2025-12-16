@@ -4,20 +4,41 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "google-contacts-cisco"
-version = "0.1.0"
-description = ""
+dynamic = ["version"]
+description = "Google Contacts integration for Cisco IP Phones"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "google-api-python-client>=2.100.0",
+    "google-auth>=2.25.0",
+    "google-auth-oauthlib>=1.1.0",
+    "lxml>=5.0.0",
+    "aiohttp>=3.9.0",
+    "python-dotenv>=1.0.0",
+    "phonenumbers>=8.13.0",
+]
 
 [project.optional-dependencies]
 dev = [
-    "black>=23.0.0",
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "mypy>=1.0.0",
-    "types-requests>=2.31.0",  # Add type stubs for common packages as needed
+    "black>=23.11.0",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.12.0",
+    "mypy>=1.7.0",
+    "ruff>=0.1.6",
+    "httpx>=0.25.0",
+    "types-requests>=2.31.0",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "google_contacts_cisco._version.__version__"}
 
 [tool.black]
 line-length = 88
