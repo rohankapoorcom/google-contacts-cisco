@@ -64,11 +64,12 @@ Every task file is a **standalone implementation guide** that includes:
 **Time**: 22-27 hours
 
 ### Phase 5: Testing (Tasks 20-22)
-- Comprehensive unit tests (pytest)
+- Test infrastructure & coverage verification
 - Integration tests (FastAPI TestClient)
 - End-to-end tests (Playwright)
 
-**Time**: 20-24 hours
+**Time**: 16-22 hours
+**Note**: Unit tests are written as part of tasks 1-19, not separately
 
 ### Phase 6: Deployment (Tasks 23-25)
 - API documentation (OpenAPI/Swagger)
@@ -287,23 +288,24 @@ Every task file is a **standalone implementation guide** that includes:
 
 ### Phase 7: Testing
 
-#### ✅ Task 7.1: Unit Tests
+#### ✅ Task 7.1: Test Infrastructure & Coverage Verification
 - **File**: [20-unit-tests.md](./20-unit-tests.md)
 - **Priority**: P1 (High)
-- **Time**: 8-10 hours
-- **Details**: pytest, comprehensive test suites, >80% coverage
+- **Time**: 4-6 hours
+- **Details**: pytest setup, shared fixtures, coverage verification
+- **Note**: Does NOT include writing unit tests (those are in tasks 1-19)
 
 #### ✅ Task 7.2: Integration Tests
 - **File**: [21-integration-tests.md](./21-integration-tests.md)
 - **Priority**: P1 (High)
 - **Time**: 6-8 hours
-- **Details**: FastAPI TestClient, end-to-end workflows
+- **Details**: FastAPI TestClient, component integration, workflows
 
 #### ✅ Task 7.3: End-to-End Tests
 - **File**: [22-end-to-end-tests.md](./22-end-to-end-tests.md)
 - **Priority**: P2 (Medium)
 - **Time**: 6-8 hours
-- **Details**: Playwright, browser automation, user flows
+- **Details**: Playwright, browser automation, complete user flows
 
 ---
 
@@ -333,7 +335,8 @@ Every task file is a **standalone implementation guide** that includes:
 
 - **Total Tasks**: 25
 - **Completed**: 25 (100%)
-- **Total Estimated Time**: 105-135 hours (13-17 developer-days)
+- **Total Estimated Time**: 101-131 hours (13-16 developer-days)
+- **Note**: Unit test time is included in implementation tasks (1-19), not separate
 
 ### By Priority
 - **P0 (Critical)**: 16 tasks - MVP requirements
@@ -344,7 +347,7 @@ Every task file is a **standalone implementation guide** that includes:
 - **Phase 1-3**: Foundation & Core (11 tasks, 45-55 hours)
 - **Phase 4-5**: Cisco & Search (5 tasks, 17-22 hours)
 - **Phase 6**: Frontend (5 tasks, 22-27 hours)
-- **Phase 7-8**: Testing & Deployment (4 tasks, 21-31 hours)
+- **Phase 7-8**: Testing & Deployment (4 tasks, 17-27 hours)
 
 ### Team Size & Timeline
 - **MVP Requirements**: Tasks 1-17 (Core + Basic Web Interface)
@@ -421,6 +424,14 @@ Every task file is a **standalone implementation guide** that includes:
 ---
 
 ## ⚠️ Important Notes
+
+### Testing Approach (Critical - Read First!)
+- **⚠️ Tests are NOT a separate task** - Each implementation task (1-19) must include unit tests
+- Write tests AS YOU CODE (TDD recommended)
+- Task is not complete until tests are written and passing
+- Minimum 80% coverage required per module
+- Each task file includes comprehensive testing requirements section
+- Task 20 focuses on test infrastructure and verification, not writing tests
 
 ### Frontend Architecture (Updated Dec 14, 2024)
 - **All frontend tasks use Vue 3 + TypeScript**

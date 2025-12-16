@@ -716,6 +716,115 @@ describe('OAuthSetup.vue', () => {
 });
 ```
 
+
+## Testing Requirements
+
+**⚠️ Critical**: This task is not complete until comprehensive unit tests are written and passing.
+
+### Test Coverage Requirements
+- All functions and methods must have tests
+- Both success and failure paths must be covered
+- Edge cases and boundary conditions must be tested
+- **Minimum coverage: 80% for this module**
+- **Target coverage: 85%+ for services, 90%+ for utilities**
+
+### Test Files to Create
+Create test file(s) in `tests/unit/` matching your implementation structure:
+
+```
+Implementation File              →  Test File
+─────────────────────────────────────────────────────────────
+[implementation path]            →  tests/unit/[same structure]/test_[filename].py
+```
+
+### Test Structure Template
+```python
+"""Test [module name].
+
+This module tests the [feature] implementation from this task.
+"""
+import pytest
+from google_contacts_cisco.[module] import [Component]
+
+
+class Test[FeatureName]:
+    """Test [feature] functionality."""
+    
+    def test_typical_use_case(self):
+        """Test the main success path."""
+        # Arrange
+        input_data = ...
+        
+        # Act
+        result = component.method(input_data)
+        
+        # Assert
+        assert result == expected
+    
+    def test_handles_invalid_input(self):
+        """Test error handling for invalid input."""
+        with pytest.raises(ValueError):
+            component.method(invalid_input)
+    
+    def test_edge_case_empty_data(self):
+        """Test behavior with empty/null data."""
+        result = component.method([])
+        assert result == []
+    
+    def test_edge_case_boundary_values(self):
+        """Test boundary conditions."""
+        ...
+```
+
+### What to Test
+- ✅ **Success paths**: Typical use cases and expected inputs
+- ✅ **Error paths**: Invalid inputs, exceptions, error conditions
+- ✅ **Edge cases**: Empty data, null values, boundary conditions, large datasets
+- ✅ **Side effects**: Database changes, file operations, API calls
+- ✅ **Return values**: Correct types, formats, and values
+- ✅ **State changes**: Object state, system state
+
+### Testing Best Practices
+- Use descriptive test names that explain what is being tested
+- Follow Arrange-Act-Assert pattern
+- Use fixtures from `tests/conftest.py` for common test data
+- Mock external dependencies (APIs, databases, file system)
+- Keep tests independent (no shared state)
+- Make tests fast (< 5 seconds per test file)
+- Test behavior, not implementation details
+
+### Running Your Tests
+```bash
+# Run tests for this specific module
+uv run pytest tests/unit/[your_test_file].py -v
+
+# Run with coverage report
+uv run pytest tests/unit/[your_test_file].py \
+    --cov=google_contacts_cisco.[your_module] \
+    --cov-report=term-missing
+
+# Run in watch mode (re-run on file changes)
+uv run pytest-watch tests/unit/[your_directory]/ -v
+```
+
+### Acceptance Criteria Additions
+- [ ] All new code has corresponding tests
+- [ ] Tests cover success cases, error cases, and edge cases
+- [ ] All tests pass (`pytest tests/unit/[module]/ -v`)
+- [ ] Coverage is >80% for this module
+- [ ] Tests are independent and can run in any order
+- [ ] External dependencies are properly mocked
+- [ ] Test names clearly describe what is being tested
+
+### Example Test Scenarios for This Task
+- Test OAuthSetup component renders
+- Test OAuth status display (connected/not connected)
+- Test connect button triggers OAuth flow
+- Test token refresh functionality
+- Test disconnect functionality
+- Test error state display
+
+
 ## Verification
 
 After completing this task:
