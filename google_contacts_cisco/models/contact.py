@@ -3,8 +3,9 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, DateTime, Index
+from sqlalchemy.types import Uuid
 from sqlalchemy.orm import relationship
-from . import Base, GUID
+from . import Base
 
 
 class Contact(Base):
@@ -12,12 +13,12 @@ class Contact(Base):
 
     __tablename__ = "contacts"
 
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
-    resource_name = Column(String, unique=True, nullable=False, index=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    resource_name = Column(String, unique=True, nullable=False)
     etag = Column(String, nullable=True)
     given_name = Column(String, nullable=True)
     family_name = Column(String, nullable=True)
-    display_name = Column(String, nullable=False, index=True)
+    display_name = Column(String, nullable=False)
     organization = Column(String, nullable=True)
     job_title = Column(String, nullable=True)
     created_at = Column(

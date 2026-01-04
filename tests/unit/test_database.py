@@ -8,7 +8,8 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from google_contacts_cisco.models import Base, Contact, PhoneNumber, SyncState
-from google_contacts_cisco.models.db_utils import create_tables, drop_tables
+from google_contacts_cisco.models.sync_state import SyncStatus
+from google_contacts_cisco.models.db_utils import create_tables, drop_tables, check_connection
 
 
 @pytest.fixture
@@ -160,21 +161,21 @@ def test_sync_state(db_session):
     """Test sync state model."""
     sync_state = SyncState(
         sync_token="token123",
-        sync_status="idle"
+        sync_status=SyncStatus.IDLE
     )
     db_session.add(sync_state)
     db_session.commit()
     
     assert sync_state.id is not None
     assert isinstance(sync_state.id, uuid.UUID)
-    assert sync_state.sync_status == "idle"
+    assert sync_state.sync_status == SyncStatus.IDLE
     assert sync_state.sync_token == "token123"
     assert sync_state.error_message is None
 
 
 def test_sync_state_statuses(db_session):
     """Test different sync state statuses."""
-    states = ["idle", "syncing", "error"]
+    states = [SyncStatus.IDLE, SyncStatus.SYNCING, SyncStatus.ERROR]
     
     for status in states:
         sync_state = SyncState(sync_status=status)
@@ -191,13 +192,13 @@ def test_sync_state_statuses(db_session):
 def test_sync_state_with_error(db_session):
     """Test sync state with error message."""
     sync_state = SyncState(
-        sync_status="error",
+        sync_status=SyncStatus.ERROR,
         error_message="Connection timeout"
     )
     db_session.add(sync_state)
     db_session.commit()
     
-    assert sync_state.sync_status == "error"
+    assert sync_state.sync_status == SyncStatus.ERROR
     assert sync_state.error_message == "Connection timeout"
 
 
@@ -298,11 +299,22 @@ def test_phone_number_foreign_key(db_session):
 
 def test_database_utils_create_tables():
     """Test create_tables utility function."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.bind = engine
+    from sqlalchemy import inspect
+    import google_contacts_cisco.models.db_utils as db_utils_module
     
-    # Should not raise an exception
-    create_tables()
+    engine = create_engine("sqlite:///:memory:")
+    original_engine = db_utils_module.engine
+    db_utils_module.engine = engine
+    
+    try:
+        create_tables()
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+        assert 'contacts' in table_names
+        assert 'phone_numbers' in table_names
+        assert 'sync_states' in table_names
+    finally:
+        db_utils_module.engine = original_engine
 
 
 def test_database_utils_drop_tables():
@@ -400,7 +412,8 @@ def test_contact_synced_at(db_session):
     
     assert contact.synced_at is None
     
-    contact.synced_at = datetime.utcnow()
+    from datetime import timezone
+    contact.synced_at = datetime.now(timezone.utc)
     db_session.commit()
     
     assert contact.synced_at is not None
@@ -463,4 +476,19 @@ def test_phone_number_primary_default(db_session):
     db_session.commit()
     
     assert phone.primary is False
+
+
+def test_check_connection():
+    """Test database connection health check."""
+    # Should return True for a valid connection
+    assert check_connection() is True
+
+
+def test_sync_state_default_status(db_session):
+    """Test that sync state defaults to IDLE status."""
+    sync_state = SyncState()
+    db_session.add(sync_state)
+    db_session.commit()
+    
+    assert sync_state.sync_status == SyncStatus.IDLE
 

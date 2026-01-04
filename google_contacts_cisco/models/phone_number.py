@@ -1,8 +1,9 @@
 """Phone number model."""
 import uuid
 from sqlalchemy import Column, String, Boolean, ForeignKey, Index
+from sqlalchemy.types import Uuid
 from sqlalchemy.orm import relationship
-from . import Base, GUID
+from . import Base
 
 
 class PhoneNumber(Base):
@@ -10,9 +11,9 @@ class PhoneNumber(Base):
     
     __tablename__ = "phone_numbers"
     
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
-    contact_id = Column(GUID(), ForeignKey("contacts.id"), nullable=False)
-    value = Column(String, nullable=False, index=True)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    contact_id = Column(Uuid(as_uuid=True), ForeignKey("contacts.id"), nullable=False)
+    value = Column(String, nullable=False)
     display_value = Column(String, nullable=False)
     type = Column(String, nullable=True)
     primary = Column(Boolean, default=False, nullable=False)

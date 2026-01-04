@@ -1,8 +1,19 @@
 """Sync state model."""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from enum import Enum
 from sqlalchemy import Column, String, DateTime
-from . import Base, GUID
+from sqlalchemy.types import Uuid
+from sqlalchemy import Enum as SQLEnum
+from . import Base
+
+
+class SyncStatus(str, Enum):
+    """Sync status enumeration."""
+    
+    IDLE = "idle"
+    SYNCING = "syncing"
+    ERROR = "error"
 
 
 class SyncState(Base):
@@ -10,10 +21,14 @@ class SyncState(Base):
     
     __tablename__ = "sync_states"
     
-    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
     sync_token = Column(String, nullable=True)
     last_sync_at = Column(DateTime, nullable=True)
-    sync_status = Column(String, default="idle", nullable=False)
+    sync_status = Column(
+        SQLEnum(SyncStatus, native_enum=False),
+        default=SyncStatus.IDLE,
+        nullable=False
+    )
     error_message = Column(String, nullable=True)
     
     def __repr__(self):
