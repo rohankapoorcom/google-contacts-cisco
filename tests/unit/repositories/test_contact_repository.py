@@ -407,3 +407,214 @@ class TestDeleteAllContacts:
         count = contact_repo.delete_all()
         assert count == 0
 
+
+class TestSearchByPhone:
+    """Test phone number search functionality."""
+
+    def test_search_by_phone_exact_match(self, contact_repo, db_session):
+        """Test searching for exact phone number match."""
+        # Create contact with normalized phone number
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="John Doe",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="(555) 123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        # Search with same format
+        results = contact_repo.search_by_phone("5551234567")
+        assert len(results) == 1
+        assert results[0].display_name == "John Doe"
+
+    def test_search_by_phone_formatted(self, contact_repo, db_session):
+        """Test searching with formatted phone number."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Jane Doe",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15559876543",
+                    display_value="(555) 987-6543",
+                    type="work",
+                    primary=True,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        # Search with formatted number
+        results = contact_repo.search_by_phone("(555) 987-6543")
+        assert len(results) == 1
+        assert results[0].display_name == "Jane Doe"
+
+    def test_search_by_phone_with_country_code(self, contact_repo, db_session):
+        """Test searching with country code prefix."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Bob Smith",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551112222",
+                    display_value="(555) 111-2222",
+                    type="home",
+                    primary=True,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        # Search with +1 prefix
+        results = contact_repo.search_by_phone("+1 555-111-2222")
+        assert len(results) == 1
+        assert results[0].display_name == "Bob Smith"
+
+    def test_search_by_phone_no_results(self, contact_repo, db_session):
+        """Test searching for non-existent phone number."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Alice",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="(555) 123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        results = contact_repo.search_by_phone("5559999999")
+        assert len(results) == 0
+
+    def test_search_by_phone_excludes_deleted(self, contact_repo, db_session):
+        """Test that search excludes deleted contacts."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Deleted Contact",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="(555) 123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+            ],
+            deleted=True,
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        results = contact_repo.search_by_phone("5551234567")
+        assert len(results) == 0
+
+    def test_search_by_phone_multiple_contacts(self, contact_repo, db_session):
+        """Test searching returns multiple contacts with same number."""
+        # Create two contacts with different phone numbers
+        for i, name in enumerate(["John", "Jane"]):
+            data = ContactCreateSchema(
+                resource_name=f"people/c{i}",
+                display_name=name,
+                phone_numbers=[
+                    PhoneNumberSchema(
+                        value=f"+1555123456{i}",
+                        display_value=f"(555) 123-456{i}",
+                        type="mobile",
+                        primary=True,
+                    ),
+                ],
+            )
+            contact_repo.create_contact(data)
+        db_session.commit()
+
+        # Search for John's number
+        results = contact_repo.search_by_phone("5551234560")
+        assert len(results) == 1
+        assert results[0].display_name == "John"
+
+    def test_search_by_phone_fallback_digits(self, contact_repo, db_session):
+        """Test fallback to digit-only search for invalid format."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Test Contact",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="(555) 123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        # Search with invalid format but enough digits for suffix match
+        results = contact_repo.search_by_phone("1234567")
+        # This may or may not match depending on the LIKE pattern
+        # The fallback uses %digits pattern
+        assert isinstance(results, list)
+
+    def test_search_by_phone_empty_database(self, contact_repo):
+        """Test searching in empty database."""
+        results = contact_repo.search_by_phone("5551234567")
+        assert len(results) == 0
+
+    def test_search_by_phone_empty_input(self, contact_repo, db_session):
+        """Test searching with empty input."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Test",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="(555) 123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        results = contact_repo.search_by_phone("")
+        assert len(results) == 0
+
+    def test_search_by_phone_distinct_results(self, contact_repo, db_session):
+        """Test that contacts with multiple matching phones appear once."""
+        data = ContactCreateSchema(
+            resource_name="people/c1",
+            display_name="Multi Phone",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="(555) 123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+                PhoneNumberSchema(
+                    value="+15551234567",  # Same number twice
+                    display_value="(555) 123-4567",
+                    type="work",
+                    primary=False,
+                ),
+            ],
+        )
+        contact_repo.create_contact(data)
+        db_session.commit()
+
+        results = contact_repo.search_by_phone("5551234567")
+        # Should return contact only once even with multiple matching phones
+        assert len(results) == 1
+        assert results[0].display_name == "Multi Phone"

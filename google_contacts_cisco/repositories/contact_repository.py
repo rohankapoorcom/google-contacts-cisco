@@ -4,6 +4,7 @@ This module provides data access operations for Contact and PhoneNumber entities
 including CRUD operations, upsert logic, and query methods.
 """
 
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID
@@ -14,6 +15,7 @@ from ..models.contact import Contact
 from ..models.phone_number import PhoneNumber
 from ..schemas.contact import ContactCreateSchema
 from ..utils.logger import get_logger
+from ..utils.phone_utils import get_phone_normalizer
 
 logger = get_logger(__name__)
 
@@ -233,4 +235,53 @@ class ContactRepository:
         count = self.db.query(Contact).delete()
         logger.info("Deleted all contacts: %d", count)
         return count
+
+    def search_by_phone(self, phone_number: str) -> List[Contact]:
+        """Search contacts by phone number.
+
+        Normalizes the input phone number and searches against normalized
+        values in the database. Falls back to digit-only suffix matching
+        if normalization fails.
+
+        Args:
+            phone_number: Phone number to search (any format)
+
+        Returns:
+            List of matching contacts (non-deleted only)
+        """
+        normalizer = get_phone_normalizer()
+
+        # Normalize search input
+        normalized = normalizer.normalize_for_search(phone_number)
+
+        if normalized:
+            # Search by normalized value (exact match)
+            return (
+                self.db.query(Contact)
+                .join(PhoneNumber)
+                .filter(
+                    Contact.deleted == False,  # noqa: E712
+                    PhoneNumber.value == normalized,
+                )
+                .distinct()
+                .all()
+            )
+        else:
+            # Fallback: search by digits only (suffix matching)
+            digits = re.sub(r"\D", "", phone_number)
+            if len(digits) >= 7:
+                # Use LIKE for suffix matching
+                pattern = f"%{digits}"
+                return (
+                    self.db.query(Contact)
+                    .join(PhoneNumber)
+                    .filter(
+                        Contact.deleted == False,  # noqa: E712
+                        PhoneNumber.value.like(pattern),
+                    )
+                    .distinct()
+                    .all()
+                )
+
+        return []
 
