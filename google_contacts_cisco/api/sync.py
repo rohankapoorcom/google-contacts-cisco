@@ -134,6 +134,147 @@ async def trigger_full_sync(
         )
 
 
+@router.post("/incremental", response_model=SyncTriggerResponse)
+async def trigger_incremental_sync(
+    db: Session = Depends(get_db),
+) -> SyncTriggerResponse:
+    """Trigger incremental synchronization of Google Contacts.
+
+    Downloads only contacts that have changed since the last sync using
+    the stored sync token. Falls back to full sync if no sync token is
+    available or if the token has expired.
+
+    Prerequisites:
+    - User must be authenticated with Google OAuth
+    - At least one full sync should have been completed (for sync token)
+
+    Returns:
+        SyncTriggerResponse with sync result and statistics
+
+    Raises:
+        HTTPException 401: If not authenticated with Google
+        HTTPException 409: If a sync is already in progress
+        HTTPException 500: If sync fails due to server error
+    """
+    # Check authentication
+    if not is_authenticated():
+        logger.warning("Incremental sync requested but user is not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated with Google. Please complete OAuth setup first.",
+        )
+
+    try:
+        sync_service = get_sync_service(db)
+
+        # Check if sync is already in progress
+        if sync_service.is_sync_in_progress():
+            logger.warning("Incremental sync requested but sync already in progress")
+            raise HTTPException(
+                status_code=409,
+                detail="A sync is already in progress. Please wait for it to complete.",
+            )
+
+        # Perform incremental sync
+        logger.info("Starting incremental sync triggered via API")
+        stats = sync_service.incremental_sync()
+
+        return SyncTriggerResponse(
+            status="success",
+            message="Incremental sync completed successfully",
+            statistics=stats.to_dict(),
+        )
+
+    except CredentialsError as e:
+        logger.error("Credentials error during sync: %s", e)
+        raise HTTPException(
+            status_code=401,
+            detail=str(e),
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception("Incremental sync failed with unexpected error")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sync failed: {str(e)}",
+        )
+
+
+@router.post("", response_model=SyncTriggerResponse)
+async def trigger_auto_sync(
+    db: Session = Depends(get_db),
+) -> SyncTriggerResponse:
+    """Trigger automatic synchronization of Google Contacts.
+
+    Automatically chooses between full and incremental sync based on
+    the current state:
+    - If a sync token exists: performs incremental sync
+    - If no sync token: performs full sync
+
+    This is the recommended endpoint for most use cases.
+
+    Prerequisites:
+    - User must be authenticated with Google OAuth
+
+    Returns:
+        SyncTriggerResponse with sync result and statistics
+
+    Raises:
+        HTTPException 401: If not authenticated with Google
+        HTTPException 409: If a sync is already in progress
+        HTTPException 500: If sync fails due to server error
+    """
+    # Check authentication
+    if not is_authenticated():
+        logger.warning("Auto sync requested but user is not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated with Google. Please complete OAuth setup first.",
+        )
+
+    try:
+        sync_service = get_sync_service(db)
+
+        # Check if sync is already in progress
+        if sync_service.is_sync_in_progress():
+            logger.warning("Auto sync requested but sync already in progress")
+            raise HTTPException(
+                status_code=409,
+                detail="A sync is already in progress. Please wait for it to complete.",
+            )
+
+        # Perform auto sync
+        logger.info("Starting auto sync triggered via API")
+        stats = sync_service.auto_sync()
+
+        # Use explicit sync_type from stats
+        sync_type_display = stats.sync_type.capitalize()
+
+        return SyncTriggerResponse(
+            status="success",
+            message=f"{sync_type_display} sync completed successfully",
+            statistics=stats.to_dict(),
+        )
+
+    except CredentialsError as e:
+        logger.error("Credentials error during sync: %s", e)
+        raise HTTPException(
+            status_code=401,
+            detail=str(e),
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.exception("Auto sync failed with unexpected error")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sync failed: {str(e)}",
+        )
+
+
 @router.get("/needs-sync")
 async def check_needs_sync(db: Session = Depends(get_db)) -> dict:
     """Check if a full sync is required.

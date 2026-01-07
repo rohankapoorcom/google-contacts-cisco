@@ -18,6 +18,7 @@ from ..repositories.sync_repository import SyncRepository
 from ..services.contact_transformer import transform_google_person_to_contact
 from ..services.google_client import (
     GoogleContactsClient,
+    SyncTokenExpiredError,
     get_google_client,
 )
 from ..utils.logger import get_logger
@@ -39,6 +40,7 @@ class SyncStatistics:
     deleted: int = 0
     errors: int = 0
     pages: int = 0
+    sync_type: str = "full"  # "full" or "incremental"
     start_time: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -57,6 +59,7 @@ class SyncStatistics:
             "deleted": self.deleted,
             "errors": self.errors,
             "pages": self.pages,
+            "sync_type": self.sync_type,
             "duration_seconds": self.duration_seconds,
         }
 
@@ -324,6 +327,150 @@ class SyncService:
             True if a sync is currently running
         """
         return self.sync_repo.is_sync_in_progress()
+
+    def incremental_sync(
+        self,
+        batch_size: int = 100,
+        page_delay: float = 0.1,
+    ) -> SyncStatistics:
+        """Perform incremental sync using sync token.
+
+        Downloads only changes (new, modified, deleted contacts) since the last
+        sync using the stored sync token. Falls back to full sync if no token
+        is available or if the token has expired.
+
+        Args:
+            batch_size: Number of contacts to commit per batch (default 100)
+            page_delay: Delay between API page requests in seconds (default 0.1)
+
+        Returns:
+            SyncStatistics with details about the sync operation
+
+        Raises:
+            Exception: If sync fails (sync state will be marked as error)
+        """
+        logger.info("Starting incremental sync")
+
+        # Get latest sync state
+        sync_state = self.sync_repo.get_latest_sync_state()
+
+        if not sync_state or not sync_state.sync_token:
+            logger.warning(
+                "No sync token available, performing full sync instead"
+            )
+            return self.full_sync(batch_size, page_delay)
+
+        sync_token = sync_state.sync_token
+        logger.info("Using sync token: %s...", sync_token[:20])
+
+        stats = SyncStatistics(sync_type="incremental")
+
+        # Create new sync state record
+        new_sync_state = self.sync_repo.create_sync_state(
+            status=SyncStatus.SYNCING
+        )
+        self.db.commit()
+
+        try:
+            # Fetch changes from Google using sync token
+            for response_data in self.google_client.list_connections(
+                page_size=100,
+                sync_token=sync_token,
+            ):
+                stats.pages += 1
+
+                # Parse response
+                response = GoogleConnectionsResponse(**response_data)
+
+                if not response.connections:
+                    logger.debug("Page %d: No changes", stats.pages)
+                else:
+                    logger.info(
+                        "Page %d: Processing %d changes",
+                        stats.pages,
+                        len(response.connections),
+                    )
+
+                    # Process contacts in this page
+                    self._process_contacts_page(
+                        response.connections, stats, batch_size
+                    )
+
+                # Store new sync token if this is the last page
+                if not response.next_page_token and response.next_sync_token:
+                    self.sync_repo.update_sync_state(
+                        new_sync_state,
+                        sync_token=response.next_sync_token,
+                    )
+                    self.db.commit()
+                    logger.info(
+                        "Stored new sync token: %s...",
+                        response.next_sync_token[:20],
+                    )
+
+                # Small delay between pages to avoid rate limits
+                if response.next_page_token:
+                    time.sleep(page_delay)
+
+            # Mark sync as complete
+            stats.end_time = datetime.now(timezone.utc)
+            self.sync_repo.update_sync_state(
+                new_sync_state, status=SyncStatus.IDLE
+            )
+            self.db.commit()
+
+            logger.info("Incremental sync completed: %s", stats.to_dict())
+            return stats
+
+        except SyncTokenExpiredError:
+            # Sync token expired, perform full sync
+            logger.warning(
+                "Sync token expired (410), falling back to full sync"
+            )
+            self.sync_repo.update_sync_state(
+                new_sync_state,
+                status=SyncStatus.ERROR,
+                error_message="Sync token expired, performing full sync",
+            )
+            self.db.commit()
+            return self.full_sync(batch_size, page_delay)
+
+        except Exception as e:
+            logger.exception("Incremental sync failed")
+            stats.end_time = datetime.now(timezone.utc)
+            self.sync_repo.update_sync_state(
+                new_sync_state,
+                status=SyncStatus.ERROR,
+                error_message=str(e),
+            )
+            self.db.commit()
+            raise
+
+    def auto_sync(
+        self,
+        batch_size: int = 100,
+        page_delay: float = 0.1,
+    ) -> SyncStatistics:
+        """Automatically choose between full and incremental sync.
+
+        Checks if a valid sync token exists and performs incremental sync if
+        available, otherwise falls back to full sync.
+
+        Args:
+            batch_size: Number of contacts to commit per batch (default 100)
+            page_delay: Delay between API page requests in seconds (default 0.1)
+
+        Returns:
+            SyncStatistics with details about the sync operation
+        """
+        sync_state = self.sync_repo.get_latest_sync_state()
+
+        if sync_state and sync_state.sync_token:
+            logger.info("Sync token available, performing incremental sync")
+            return self.incremental_sync(batch_size, page_delay)
+        else:
+            logger.info("No sync token available, performing full sync")
+            return self.full_sync(batch_size, page_delay)
 
 
 def get_sync_service(

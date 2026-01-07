@@ -207,6 +207,281 @@ class TestFullSyncEndpoint:
         assert "Database error" in data["detail"]
 
 
+class TestIncrementalSyncEndpoint:
+    """Test POST /api/sync/incremental endpoint."""
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    def test_incremental_sync_not_authenticated(self, mock_auth, client):
+        """Test incremental sync fails when not authenticated."""
+        mock_auth.return_value = False
+
+        response = client.post("/api/sync/incremental")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Not authenticated" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_incremental_sync_already_in_progress(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test incremental sync fails when already in progress."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = True
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/incremental")
+
+        assert response.status_code == 409
+        data = response.json()
+        assert "already in progress" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_incremental_sync_success(self, mock_get_service, mock_auth, client):
+        """Test successful incremental sync."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.incremental_sync.return_value = SyncStatistics(
+            total_fetched=10,
+            created=2,
+            updated=8,
+            deleted=3,
+            errors=0,
+            pages=1,
+        )
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/incremental")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["message"] == "Incremental sync completed successfully"
+        assert data["statistics"]["total_fetched"] == 10
+        assert data["statistics"]["created"] == 2
+        assert data["statistics"]["updated"] == 8
+        assert data["statistics"]["deleted"] == 3
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_incremental_sync_with_no_changes(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test incremental sync when no changes."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.incremental_sync.return_value = SyncStatistics(
+            total_fetched=0,
+            created=0,
+            updated=0,
+            deleted=0,
+            errors=0,
+            pages=1,
+        )
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/incremental")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["statistics"]["total_fetched"] == 0
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_incremental_sync_credentials_error(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test incremental sync with credentials error."""
+        from google_contacts_cisco.services.google_client import CredentialsError
+
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.incremental_sync.side_effect = CredentialsError("Token expired")
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/incremental")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Token expired" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_incremental_sync_server_error(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test incremental sync with unexpected error."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.incremental_sync.side_effect = Exception("API failure")
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/incremental")
+
+        assert response.status_code == 500
+        data = response.json()
+        assert "API failure" in data["detail"]
+
+
+class TestAutoSyncEndpoint:
+    """Test POST /api/sync endpoint."""
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    def test_auto_sync_not_authenticated(self, mock_auth, client):
+        """Test auto sync fails when not authenticated."""
+        mock_auth.return_value = False
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Not authenticated" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_auto_sync_already_in_progress(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test auto sync fails when already in progress."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = True
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 409
+        data = response.json()
+        assert "already in progress" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_auto_sync_success_incremental(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test successful auto sync (incremental)."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        # Incremental sync stats (no created, only updated)
+        mock_service.auto_sync.return_value = SyncStatistics(
+            total_fetched=5,
+            created=0,
+            updated=5,
+            deleted=0,
+            errors=0,
+            pages=1,
+        )
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert "sync completed successfully" in data["message"]
+        assert data["statistics"]["total_fetched"] == 5
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_auto_sync_success_full(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test successful auto sync (full)."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        # Full sync stats (created contacts)
+        mock_service.auto_sync.return_value = SyncStatistics(
+            total_fetched=100,
+            created=100,
+            updated=0,
+            deleted=0,
+            errors=0,
+            pages=5,
+        )
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["statistics"]["created"] == 100
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_auto_sync_no_changes(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test auto sync with no changes."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.auto_sync.return_value = SyncStatistics(
+            total_fetched=0,
+            created=0,
+            updated=0,
+            deleted=0,
+            errors=0,
+            pages=1,
+        )
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["statistics"]["total_fetched"] == 0
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_auto_sync_credentials_error(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test auto sync with credentials error."""
+        from google_contacts_cisco.services.google_client import CredentialsError
+
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.auto_sync.side_effect = CredentialsError("Invalid credentials")
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Invalid credentials" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_auto_sync_server_error(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test auto sync with unexpected error."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.is_sync_in_progress.return_value = False
+        mock_service.auto_sync.side_effect = Exception("Connection error")
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync")
+
+        assert response.status_code == 500
+        data = response.json()
+        assert "Connection error" in data["detail"]
+
+
 class TestNeedsSyncEndpoint:
     """Test GET /api/sync/needs-sync endpoint."""
 

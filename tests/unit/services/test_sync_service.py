@@ -4,9 +4,10 @@ This module tests the SyncService implementation for full and incremental
 synchronization of Google Contacts.
 """
 
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -17,7 +18,6 @@ from google_contacts_cisco.services.sync_service import (
     SyncStatistics,
     get_sync_service,
 )
-from google_contacts_cisco.api.schemas import GooglePerson
 
 
 @pytest.fixture
@@ -467,6 +467,430 @@ class TestSyncChecks:
         db_session.commit()
 
         assert sync_service.is_sync_in_progress() is False
+
+
+class TestIncrementalSync:
+    """Test incremental synchronization functionality."""
+
+    def test_incremental_sync_with_updates(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test incremental sync with updated contacts."""
+        # Create existing sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="existing_sync_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+
+        # Create existing contact
+        existing = Contact(
+            resource_name="people/c1",
+            display_name="Old Name",
+            given_name="Old",
+        )
+        db_session.add(existing)
+        db_session.commit()
+
+        # Mock API response with changes
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "Updated Name", "givenName": "Updated"}],
+                    "phoneNumbers": [{"value": "5551234567"}],
+                },
+            ],
+            "nextSyncToken": "new_sync_token_456",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.incremental_sync()
+
+        assert stats.updated == 1
+        assert stats.deleted == 0
+        assert stats.created == 0
+
+        # Verify contact was updated
+        updated_contact = db_session.query(Contact).first()
+        assert updated_contact.display_name == "Updated Name"
+
+        # Verify new sync token stored
+        new_sync_state = (
+            db_session.query(SyncState)
+            .order_by(SyncState.last_sync_at.desc())
+            .first()
+        )
+        assert new_sync_state.sync_token == "new_sync_token_456"
+
+    def test_incremental_sync_with_deletions(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test incremental sync with deleted contacts."""
+        # Create existing sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="existing_sync_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+
+        # Create existing contact
+        existing = Contact(
+            resource_name="people/c1",
+            display_name="To Delete",
+            deleted=False,
+        )
+        db_session.add(existing)
+        db_session.commit()
+
+        # Mock API response with deleted contact
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "To Delete"}],
+                    "phoneNumbers": [],
+                    "metadata": {"deleted": True},
+                },
+            ],
+            "nextSyncToken": "new_sync_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.incremental_sync()
+
+        assert stats.deleted == 1
+
+        # Verify contact was soft-deleted
+        contact = db_session.query(Contact).first()
+        assert contact.deleted is True
+
+    def test_incremental_sync_no_changes(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test incremental sync when no changes."""
+        # Create existing sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="existing_sync_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Mock empty response
+        mock_response = {
+            "connections": [],
+            "nextSyncToken": "new_sync_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.incremental_sync()
+
+        assert stats.total_fetched == 0
+        assert stats.updated == 0
+        assert stats.deleted == 0
+        assert stats.pages == 1
+
+    def test_incremental_sync_falls_back_to_full_without_token(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test incremental sync falls back to full sync when no token."""
+        # No sync state means no token
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "New Contact"}],
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextSyncToken": "new_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.incremental_sync()
+
+        # Should have done full sync
+        assert stats.created == 1
+        assert db_session.query(Contact).count() == 1
+
+    def test_incremental_sync_with_new_contacts(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test incremental sync with new contacts added."""
+        # Create existing sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="existing_sync_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Mock API response with new contact
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c_new",
+                    "names": [{"displayName": "Brand New Contact"}],
+                    "phoneNumbers": [{"value": "5559999999"}],
+                },
+            ],
+            "nextSyncToken": "new_sync_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.incremental_sync()
+
+        assert stats.created == 1
+        assert stats.updated == 0
+        assert db_session.query(Contact).count() == 1
+
+        new_contact = db_session.query(Contact).first()
+        assert new_contact.display_name == "Brand New Contact"
+
+    def test_incremental_sync_multiple_pages(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test incremental sync with multiple pages of changes."""
+        # Create existing sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="existing_sync_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Mock multiple pages
+        page1 = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "Contact 1"}],
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextPageToken": "page2_token",
+        }
+        page2 = {
+            "connections": [
+                {
+                    "resourceName": "people/c2",
+                    "names": [{"displayName": "Contact 2"}],
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextSyncToken": "final_sync_token",
+        }
+        mock_google_client.list_connections.return_value = [page1, page2]
+
+        stats = sync_service.incremental_sync(page_delay=0)
+
+        assert stats.pages == 2
+        assert stats.total_fetched == 2
+        assert db_session.query(Contact).count() == 2
+
+
+class TestIncrementalSyncTokenExpired:
+    """Test sync token expiration handling."""
+
+    def test_incremental_sync_token_expired_falls_back_to_full(
+        self, db_session, mock_google_client
+    ):
+        """Test incremental sync falls back to full sync when token expires."""
+        from google_contacts_cisco.services.google_client import SyncTokenExpiredError
+
+        # Create existing sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="expired_sync_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # First call fails with token expired
+        def side_effect(*args, **kwargs):
+            if kwargs.get("sync_token") == "expired_sync_token":
+                raise SyncTokenExpiredError("Sync token expired")
+            return [
+                {
+                    "connections": [
+                        {
+                            "resourceName": "people/c1",
+                            "names": [{"displayName": "Contact"}],
+                            "phoneNumbers": [],
+                        }
+                    ],
+                    "nextSyncToken": "new_token",
+                }
+            ]
+
+        mock_google_client.list_connections.side_effect = side_effect
+
+        sync_service = SyncService(db_session, google_client=mock_google_client)
+        stats = sync_service.incremental_sync()
+
+        # Should fall back to full sync
+        assert stats.created == 1
+        assert db_session.query(Contact).count() == 1
+
+
+class TestAutoSync:
+    """Test auto sync functionality."""
+
+    def test_auto_sync_with_token_uses_incremental(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test auto sync uses incremental when token exists."""
+        # Create sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="valid_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        mock_response = {
+            "connections": [],
+            "nextSyncToken": "new_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        sync_service.auto_sync()
+
+        # Should have performed incremental sync (called with sync_token)
+        mock_google_client.list_connections.assert_called()
+        call_kwargs = mock_google_client.list_connections.call_args[1]
+        assert call_kwargs.get("sync_token") == "valid_token"
+
+    def test_auto_sync_without_token_uses_full(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test auto sync uses full sync when no token."""
+        # No sync state
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "New Contact"}],
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextSyncToken": "new_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.auto_sync()
+
+        # Should have created contacts
+        assert stats.created == 1
+        assert db_session.query(Contact).count() == 1
+
+    def test_auto_sync_with_expired_token_in_sync_state(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test auto sync when sync state exists but token is None."""
+        # Create sync state without token (e.g., after error)
+        sync_state = SyncState(
+            sync_status=SyncStatus.ERROR,
+            sync_token=None,
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "Contact"}],
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextSyncToken": "new_token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.auto_sync()
+
+        # Should do full sync
+        assert stats.created == 1
+
+
+class TestIncrementalSyncErrors:
+    """Test error handling in incremental sync."""
+
+    def test_incremental_sync_sets_error_state_on_failure(
+        self, db_session, mock_google_client
+    ):
+        """Test that incremental sync sets error state on failure."""
+        # Create sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="valid_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        mock_google_client.list_connections.side_effect = Exception("API Error")
+
+        sync_service = SyncService(db_session, google_client=mock_google_client)
+
+        with pytest.raises(Exception, match="API Error"):
+            sync_service.incremental_sync()
+
+        # Verify error state
+        latest_state = (
+            db_session.query(SyncState)
+            .order_by(SyncState.last_sync_at.desc())
+            .first()
+        )
+        assert latest_state.sync_status == SyncStatus.ERROR
+        assert "API Error" in latest_state.error_message
+
+    def test_incremental_sync_handles_contact_errors(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test that incremental sync continues after individual contact errors."""
+        # Create sync state with token
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="valid_token",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Response with multiple contacts
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "Valid Contact"}],
+                    "phoneNumbers": [],
+                },
+                {
+                    "resourceName": "people/c2",
+                    "names": [],  # Uses resource name as fallback
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextSyncToken": "token",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        stats = sync_service.incremental_sync()
+
+        # Both should be processed
+        assert stats.total_fetched == 2
+        assert stats.errors == 0  # No errors because fallback works
 
 
 class TestGetSyncServiceFactory:
