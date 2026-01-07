@@ -1,0 +1,427 @@
+# Task Execution Prompt
+
+## Overview
+
+You are working on the **Google Contacts Cisco Directory** project, a comprehensive application that synchronizes Google Contacts and exposes them as a Cisco-formatted XML directory for IP phones, along with a modern web interface for contact management.
+
+This project has been fully planned with 25 detailed implementation tasks organized across 8 phases. Your role is to engineer the solution for a **specific task** following the implementation guide provided.
+
+## Project Structure
+
+- **Planning Documents**: `.ai/planning/` - Contains project overview, requirements, architecture, and technology stack documentation
+- **Task Index**: `.ai/planning/tasks/00-task-index.md` - Master index of all 25 tasks with dependencies, priorities, and time estimates
+- **Task Files**: `.ai/planning/tasks/01-*.md` through `.ai/planning/tasks/25-*.md` - Standalone implementation guides with complete code examples
+
+## Execution Workflow
+
+When assigned a task, follow this systematic workflow:
+
+### 1. Review Phase
+
+**Objective**: Understand the task requirements and context
+
+- [ ] Read the assigned task file thoroughly from start to finish
+- [ ] Review the task's dependencies listed in the task index
+- [ ] Verify that all prerequisite tasks are completed
+- [ ] Check the acceptance criteria checklist
+- [ ] Review any related documentation linked in the task file
+- [ ] Understand the technical context and design decisions
+
+**Key Questions to Answer**:
+- What is the task trying to accomplish?
+- What are the acceptance criteria?
+- What dependencies must be in place?
+- What tests are required?
+- What are the common pitfalls to avoid?
+
+### 2. Branch Creation
+
+**Objective**: Create an isolated development environment
+
+```bash
+# Create a feature branch using the task naming convention
+git checkout -b task/{task-number}-{short-description}
+
+# Example:
+git checkout -b task/01-environment-setup
+```
+
+**Branch Naming Convention**:
+- Format: `task/{number}-{kebab-case-description}`
+- Keep description short but descriptive
+- Match the task file name for clarity
+
+### 3. Implementation Phase
+
+**Objective**: Implement the solution according to task specifications
+
+#### Code Implementation
+
+- [ ] Follow the implementation steps in sequential order
+- [ ] Use the code examples provided (they are production-ready)
+- [ ] Maintain consistent code style and formatting
+- [ ] Add comprehensive inline comments for complex logic
+- [ ] Implement proper error handling and logging
+- [ ] Follow Python/JavaScript best practices
+
+#### Test-Driven Development (TDD)
+
+**⚠️ Critical**: Tests are NOT separate - write them AS YOU CODE
+
+- [ ] Write unit tests alongside implementation code
+- [ ] Aim for >80% code coverage minimum
+- [ ] Use the test examples provided in the task file
+- [ ] Test edge cases and error conditions
+- [ ] Verify all tests pass before proceeding
+
+#### Code Quality Standards
+
+- **Python Backend**:
+  - Follow PEP 8 style guidelines
+  - Use type hints for function signatures
+  - Write docstrings for classes and functions
+  - Use async/await for I/O operations
+  - Handle exceptions gracefully
+
+- **TypeScript Frontend** (Vue 3):
+  - Use Composition API with `<script setup>`
+  - Maintain strong typing (no `any`)
+  - Use composables for reusable logic
+  - Follow Vue style guide conventions
+  - Implement proper component lifecycle
+
+- **General**:
+  - Keep functions small and focused (single responsibility)
+  - Use meaningful variable and function names
+  - Avoid code duplication (DRY principle)
+  - Add comments for "why", not "what"
+  - Consider security implications
+
+### 4. Verification Phase
+
+**Objective**: Ensure the implementation meets all acceptance criteria
+
+#### Automated Verification
+
+```bash
+# Run unit tests with coverage
+pytest --cov=google_contacts_cisco --cov-report=term-missing
+
+# Run linters and type checkers
+ruff check .
+mypy google_contacts_cisco/
+
+# Run frontend tests (if applicable)
+cd frontend && npm run test
+```
+
+#### Manual Verification
+
+- [ ] Review each acceptance criterion from the task file
+- [ ] Test the functionality manually if applicable
+- [ ] Verify error handling with invalid inputs
+- [ ] Check performance metrics if specified
+- [ ] Review the verification steps in the task file
+
+#### Completeness Checklist
+
+- [ ] All code is implemented and functional
+- [ ] All unit tests written and passing
+- [ ] Code coverage meets minimum threshold (>80%)
+- [ ] All acceptance criteria satisfied
+- [ ] No linter errors or warnings
+- [ ] Type checking passes (no mypy errors)
+- [ ] Documentation comments added
+- [ ] No TODO or FIXME comments left in code
+
+### 5. Code Review Phase
+
+**Objective**: Self-review for quality and accuracy
+
+Perform a thorough self-review:
+
+- [ ] **Correctness**: Does the code solve the problem correctly?
+- [ ] **Completeness**: Are all requirements met?
+- [ ] **Quality**: Is the code maintainable and well-structured?
+- [ ] **Security**: Are there any security vulnerabilities?
+- [ ] **Performance**: Are there any obvious performance issues?
+- [ ] **Testing**: Is test coverage adequate?
+- [ ] **Documentation**: Are complex parts well-documented?
+- [ ] **Error Handling**: Are errors handled gracefully?
+
+Use these commands to aid review:
+
+```bash
+# Check for common issues
+git diff --check
+
+# Review changes
+git diff
+
+# Check test coverage
+pytest --cov=google_contacts_cisco --cov-report=html
+# Open htmlcov/index.html to review coverage visually
+```
+
+### 6. Task Status Update
+
+**Objective**: Mark the task as complete in the documentation
+
+Update the task file to indicate completion:
+
+- [ ] Add a completion marker at the top of the task file
+- [ ] Document any deviations from the planned approach
+- [ ] Note any lessons learned or issues encountered
+- [ ] Update estimated vs. actual time spent (optional)
+
+**Example Completion Marker**:
+
+```markdown
+## Task Status
+
+**Status**: ✅ Completed  
+**Completed Date**: December 18, 2024  
+**Actual Time**: 4 hours  
+**Implemented By**: AI Assistant  
+**Notes**: Implementation completed as specified. No major deviations.
+```
+
+Add this section right after the task overview/description.
+
+### 7. Commit Phase
+
+**Objective**: Create a clean, descriptive commit
+
+#### Commit Message Guidelines
+
+Follow the conventional commit format:
+
+```
+<type>(<scope>): <short summary>
+
+<detailed description>
+
+- Key change 1
+- Key change 2
+- Key change 3
+```
+
+**Types**:
+- `feat`: New feature implementation
+- `fix`: Bug fix
+- `refactor`: Code refactoring without feature changes
+- `test`: Adding or updating tests
+- `docs`: Documentation updates
+- `chore`: Build, configuration, or tooling changes
+
+**Examples**:
+
+```bash
+# Example 1: Foundation task
+feat(env): setup project environment with uv and devcontainer
+
+Implements Task 01: Environment Setup
+- Configure pyproject.toml with all dependencies
+- Set up semantic versioning with _version.py
+- Add devcontainer for consistent development environment
+- Create placeholder modules for project structure
+- Add comprehensive unit tests with >90% coverage
+
+# Example 2: Feature implementation
+feat(sync): implement full contact synchronization
+
+Implements Task 07: Full Sync Implementation
+- Add FullSyncService with batch processing
+- Integrate Google People API for contact retrieval
+- Store contacts and phone numbers in database
+- Add progress tracking and error handling
+- Include comprehensive test suite with mocking
+
+# Example 3: Bug fix during implementation
+fix(oauth): handle token refresh race condition
+
+- Add lock mechanism for token refresh
+- Prevent multiple simultaneous refresh attempts
+- Add test coverage for concurrent token access
+```
+
+#### Committing Changes
+
+```bash
+# Review what will be committed
+git status
+git diff
+
+# Stage all changes
+git add .
+
+# Commit with a descriptive message
+git commit -m "feat(scope): description
+
+Detailed notes here..."
+
+# Verify commit
+git log -1 --stat
+```
+
+### 8. Final Checklist
+
+Before considering the task complete:
+
+- [ ] Branch created and checked out
+- [ ] Task file reviewed and understood
+- [ ] All implementation steps completed
+- [ ] Unit tests written and passing (>80% coverage)
+- [ ] Code self-reviewed for quality and accuracy
+- [ ] All acceptance criteria verified
+- [ ] Linters and type checkers passing
+- [ ] Task file updated with completion status
+- [ ] Changes committed with descriptive message
+- [ ] Ready to proceed to next task or create PR
+
+---
+
+## Important Guidelines
+
+### Testing Philosophy
+
+**⚠️ Critical**: Tests are an integral part of implementation, not a separate phase.
+
+- Write tests ALONGSIDE your code (TDD approach recommended)
+- Each function/class should have corresponding tests
+- Don't mark a task "complete" until tests are written and passing
+- Minimum 80% coverage required per module
+- Focus on testing behavior, not implementation details
+
+### Dependency Management
+
+- Always verify dependencies are completed before starting
+- If a dependency is incomplete, address it first
+- Dependencies are listed in each task file and the task index
+- Some tasks can be parallelized if dependencies allow
+
+### Performance Considerations
+
+Keep these performance targets in mind:
+
+- **Cisco XML Directory**: Response time <100ms
+- **Search API**: Response time <250ms
+- **Database**: Support 10,000+ contacts efficiently
+- **Sync Operations**: Use incremental sync after initial full sync
+
+### Security Best Practices
+
+- Never commit sensitive credentials or API keys
+- Use environment variables for configuration
+- Validate all user inputs with Pydantic models
+- Implement proper error handling (don't leak sensitive info)
+- Use HTTPS for production deployments
+- Follow OAuth 2.0 best practices for token management
+
+### Code Organization
+
+The project follows this structure:
+
+```
+google_contacts_cisco/
+├── __init__.py
+├── _version.py
+├── main.py              # FastAPI application entry point
+├── api/                 # API endpoints (routers)
+├── auth/                # OAuth and authentication
+├── models/              # SQLAlchemy database models
+├── repositories/        # Database access layer
+├── services/            # Business logic
+└── utils/               # Helper utilities
+
+frontend/                # Vue 3 + TypeScript frontend
+├── src/
+│   ├── components/      # Vue components
+│   ├── views/           # Page views
+│   ├── composables/     # Reusable composition functions
+│   ├── types/           # TypeScript type definitions
+│   └── utils/           # Helper utilities
+
+tests/                   # Test suite
+├── unit/                # Unit tests (mirror src structure)
+├── integration/         # Integration tests
+└── e2e/                 # End-to-end tests
+```
+
+### Common Pitfalls to Avoid
+
+1. **Skipping Tests**: Don't defer test writing - write tests as you code
+2. **Ignoring Dependencies**: Ensure prerequisite tasks are truly complete
+3. **Copying Without Understanding**: Understand the code, don't just copy-paste
+4. **Incomplete Error Handling**: Always handle exceptions and edge cases
+5. **Poor Commit Messages**: Write clear, descriptive commit messages
+6. **Not Verifying Acceptance Criteria**: Check each criterion explicitly
+7. **Leaving Debug Code**: Remove console.log, print statements, and breakpoints
+8. **Ignoring Type Checking**: Resolve all mypy and TypeScript errors
+
+### Getting Help
+
+If you encounter issues:
+
+1. **Review Related Documentation**: Check links in the task file
+2. **Check Architecture Docs**: Review `.ai/planning/` for design decisions
+3. **Look at Previous Tasks**: Similar patterns may be used elsewhere
+4. **Review Common Issues**: Each task file has a "Common Issues" section
+5. **Consult Official Docs**: Links provided in each task file
+
+---
+
+## Success Criteria
+
+A task is successfully completed when:
+
+✅ All acceptance criteria are met  
+✅ All unit tests written and passing (>80% coverage)  
+✅ Code passes all linters and type checkers  
+✅ Functionality verified manually (if applicable)  
+✅ Code reviewed for quality and security  
+✅ Task file updated with completion status  
+✅ Changes committed with descriptive message  
+✅ No known bugs or issues remaining  
+
+---
+
+## Next Steps
+
+After completing a task:
+
+1. **Review the Task Index**: Check what tasks are now unblocked
+2. **Plan Next Task**: Identify the next task in the dependency chain
+3. **Take a Break**: Complex tasks are mentally demanding
+4. **Share Knowledge**: Document any insights or learnings
+5. **Consider PR Creation**: When a logical milestone is reached
+
+---
+
+## Additional Resources
+
+- **Task Index**: `.ai/planning/tasks/00-task-index.md`
+- **Project Overview**: `.ai/planning/01-project-overview.md`
+- **Architecture**: `.ai/planning/03-architecture.md`
+- **Technology Stack**: `.ai/planning/04-technology-stack.md`
+- **Cisco XML Requirements**: `.ai/planning/06-cisco-xml-requirements.md`
+
+---
+
+## Ready to Begin?
+
+When you're ready to execute a task:
+
+1. Specify which task you're working on (e.g., "Task 02: Database Setup")
+2. Follow the 8-step execution workflow above
+3. Use the task file as your primary implementation guide
+4. Maintain high code quality and test coverage standards
+5. Mark the task complete when all criteria are satisfied
+
+**Let's build something great! 🚀**
+
+---
+
+*Version: 1.0*  
+*Last Updated: December 18, 2024*  
+*Project: Google Contacts Cisco Directory*
