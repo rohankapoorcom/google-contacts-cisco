@@ -8,7 +8,9 @@ This module provides FastAPI endpoints for the OAuth 2.0 flow:
 """
 
 import logging
+from html import escape
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -140,8 +142,10 @@ async def auth_callback(
 
         logger.info("OAuth authentication completed successfully")
 
-        # Check if state contains a redirect URI
-        redirect_to = state if state and state.startswith("/") else "/"
+        # Validate redirect is a safe relative path (not protocol-relative)
+        redirect_to = "/"
+        if state and state.startswith("/") and not state.startswith("//"):
+            redirect_to = state
 
         return HTMLResponse(
             content=_render_success_page(redirect_to),
@@ -223,6 +227,9 @@ def _render_success_page(redirect_to: str = "/") -> str:
     Returns:
         HTML content string
     """
+    # Escape for safe use in HTML attribute (URL-encode for href)
+    safe_redirect = quote(redirect_to, safe="/")
+
     return f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -282,7 +289,7 @@ def _render_success_page(redirect_to: str = "/") -> str:
         <div class="success-icon">✅</div>
         <h1>Authentication Successful!</h1>
         <p>Your Google account has been connected. You can now sync contacts.</p>
-        <a href="{redirect_to}">Continue to Application</a>
+        <a href="{safe_redirect}">Continue to Application</a>
     </div>
 </body>
 </html>
@@ -299,6 +306,10 @@ def _render_error_page(error: str, detail: str) -> str:
     Returns:
         HTML content string
     """
+    # Escape user-controlled content to prevent XSS
+    safe_error = escape(error)
+    safe_detail = escape(detail)
+
     return f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -367,11 +378,10 @@ def _render_error_page(error: str, detail: str) -> str:
     <div class="container">
         <div class="error-icon">❌</div>
         <h1>Authentication Failed</h1>
-        <p>{detail}</p>
-        <div class="error-code">Error: {error}</div>
+        <p>{safe_detail}</p>
+        <div class="error-code">Error: {safe_error}</div>
         <a href="/">Return to Home</a>
     </div>
 </body>
 </html>
 """
-
