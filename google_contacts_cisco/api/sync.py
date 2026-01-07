@@ -249,15 +249,12 @@ async def trigger_auto_sync(
         logger.info("Starting auto sync triggered via API")
         stats = sync_service.auto_sync()
 
-        # Determine sync type from stats for message
-        is_incremental = stats.created == 0 and stats.total_fetched > 0
-        sync_type = "Incremental" if is_incremental else "Full"
-        if stats.total_fetched == 0:
-            sync_type = "Incremental"  # No changes found
+        # Use explicit sync_type from stats
+        sync_type_display = stats.sync_type.capitalize()
 
         return SyncTriggerResponse(
             status="success",
-            message=f"{sync_type} sync completed successfully",
+            message=f"{sync_type_display} sync completed successfully",
             statistics=stats.to_dict(),
         )
 

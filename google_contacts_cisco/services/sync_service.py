@@ -40,6 +40,7 @@ class SyncStatistics:
     deleted: int = 0
     errors: int = 0
     pages: int = 0
+    sync_type: str = "full"  # "full" or "incremental"
     start_time: datetime = field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
@@ -58,6 +59,7 @@ class SyncStatistics:
             "deleted": self.deleted,
             "errors": self.errors,
             "pages": self.pages,
+            "sync_type": self.sync_type,
             "duration_seconds": self.duration_seconds,
         }
 
@@ -361,7 +363,7 @@ class SyncService:
         sync_token = sync_state.sync_token
         logger.info("Using sync token: %s...", sync_token[:20])
 
-        stats = SyncStatistics()
+        stats = SyncStatistics(sync_type="incremental")
 
         # Create new sync state record
         new_sync_state = self.sync_repo.create_sync_state(

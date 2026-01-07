@@ -4,9 +4,10 @@ This module tests the SyncService implementation for full and incremental
 synchronization of Google Contacts.
 """
 
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -17,7 +18,6 @@ from google_contacts_cisco.services.sync_service import (
     SyncStatistics,
     get_sync_service,
 )
-from google_contacts_cisco.api.schemas import GooglePerson
 
 
 @pytest.fixture
@@ -762,7 +762,7 @@ class TestAutoSync:
         }
         mock_google_client.list_connections.return_value = [mock_response]
 
-        stats = sync_service.auto_sync()
+        sync_service.auto_sync()
 
         # Should have performed incremental sync (called with sync_token)
         mock_google_client.list_connections.assert_called()
