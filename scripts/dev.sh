@@ -25,6 +25,20 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM
 
+# Check if a port is available
+check_port() {
+    local port=$1
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        echo -e "${RED}Error: Port $port is already in use${NC}"
+        return 1
+    fi
+    return 0
+}
+
+# Check port availability
+check_port 8000 || exit 1
+check_port 5173 || exit 1
+
 # Start FastAPI backend
 echo -e "${GREEN}Starting FastAPI backend on http://localhost:8000...${NC}"
 uv run uvicorn google_contacts_cisco.main:app --reload --host 0.0.0.0 --port 8000 &

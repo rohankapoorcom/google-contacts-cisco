@@ -46,31 +46,32 @@ const features = [
 ]
 
 onMounted(async () => {
-  try {
-    // Fetch sync info and OAuth status in parallel
-    const [syncInfo, oauthStatus] = await Promise.allSettled([
-      api.getSyncInfo(),
-      api.getOAuthStatus(),
-    ])
+  // Fetch sync info and OAuth status in parallel
+  const [syncInfo, oauthStatus] = await Promise.allSettled([
+    api.getSyncInfo(),
+    api.getOAuthStatus(),
+  ])
 
-    // Handle sync info
-    if (syncInfo.status === 'fulfilled') {
-      const info = syncInfo.value as SyncInfo
-      status.value.total_contacts = info.total_contacts
-      status.value.last_sync = info.last_sync
-    }
-
-    // Handle OAuth status
-    if (oauthStatus.status === 'fulfilled') {
-      const auth = oauthStatus.value as OAuthStatus
-      status.value.oauth_configured = auth.authenticated
-    }
-  } catch (e) {
-    console.error('Failed to load system status:', e)
+  // Handle sync info
+  if (syncInfo.status === 'fulfilled') {
+    const info = syncInfo.value as SyncInfo
+    status.value.total_contacts = info.total_contacts
+    status.value.last_sync = info.last_sync
+  } else {
+    console.error('Failed to load sync info:', syncInfo.reason)
     status.value.error = 'Failed to load system status'
-  } finally {
-    status.value.loading = false
   }
+
+  // Handle OAuth status
+  if (oauthStatus.status === 'fulfilled') {
+    const auth = oauthStatus.value as OAuthStatus
+    status.value.oauth_configured = auth.authenticated
+  } else {
+    console.error('Failed to load OAuth status:', oauthStatus.reason)
+    status.value.error = 'Failed to load system status'
+  }
+
+  status.value.loading = false
 })
 
 // Format date for display

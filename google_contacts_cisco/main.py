@@ -118,7 +118,7 @@ if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
 
     # Serve index.html for all non-API routes (SPA fallback)
     @app.get("/{full_path:path}")
-    async def serve_spa(request: Request, full_path: str) -> FileResponse:
+    async def serve_spa(_request: Request, full_path: str) -> FileResponse:
         """Serve Vue SPA for all non-API routes."""
         # Skip API and other backend routes
         api_prefixes = ("api/", "auth/", "directory/", "health", "docs", "openapi.json")
@@ -129,9 +129,17 @@ if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
             raise HTTPException(status_code=404, detail="Not found")
 
         # Check for static file first (e.g., vite.svg, favicon.ico)
+        # Prevent path traversal attacks by resolving and checking path is within STATIC_DIR
         static_file = STATIC_DIR / full_path
-        if static_file.exists() and static_file.is_file():
-            return FileResponse(static_file)
+        resolved = static_file.resolve()
+        try:
+            resolved.relative_to(STATIC_DIR)
+        except ValueError:
+            # Path is outside STATIC_DIR, likely a path traversal attempt
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+        if resolved.exists() and resolved.is_file():
+            return FileResponse(resolved)
 
         # Serve index.html for all other routes (SPA routing)
         return FileResponse(STATIC_DIR / "index.html")

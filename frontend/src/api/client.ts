@@ -24,8 +24,9 @@ class ApiClient {
   private client: AxiosInstance
 
   constructor() {
-    // In development, Vite proxy handles the backend connection
-    // In production, the frontend is served from the same origin as the API
+    // baseURL is intentionally empty:
+    // - Development: Vite proxy (vite.config.ts) forwards /api, /auth, etc. to backend
+    // - Production: Frontend served from same origin as API, no proxy needed
     this.client = axios.create({
       baseURL: import.meta.env.DEV ? '' : '',
       headers: {

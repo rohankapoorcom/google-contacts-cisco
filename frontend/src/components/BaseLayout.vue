@@ -9,7 +9,7 @@ import { useRouter, useRoute } from 'vue-router'
 const router = useRouter()
 const route = useRoute()
 const isMobileMenuOpen = ref(false)
-const version = ref('0.1.0')
+const version = ref(__APP_VERSION__)
 
 // Navigation items
 const navigation = [
@@ -179,9 +179,9 @@ const currentYear = computed(() => new Date().getFullYear())
             © {{ currentYear }} Google Contacts Cisco Directory
           </p>
           <div class="flex items-center gap-4">
-            <a 
-              href="https://github.com" 
-              target="_blank" 
+            <a
+              href="https://github.com/rohankapoorcom/google-contacts-cisco"
+              target="_blank"
               rel="noopener noreferrer"
               class="text-slate-400 hover:text-slate-600 transition-colors"
             >
