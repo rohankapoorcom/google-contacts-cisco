@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI
 
 from ._version import __version__
+from .api.directory_routes import router as directory_router
 from .api.google import router as google_router
 from .api.routes import router as auth_router
 from .api.sync import router as sync_router
@@ -61,6 +62,7 @@ app = FastAPI(
 
 # Include API routers
 app.include_router(auth_router)
+app.include_router(directory_router)
 app.include_router(google_router)
 app.include_router(sync_router)
 
