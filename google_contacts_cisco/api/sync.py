@@ -1,14 +1,21 @@
 """API routes for synchronization operations.
 
 This module provides FastAPI endpoints for managing contact synchronization:
+- /api/sync - Trigger auto synchronization
 - /api/sync/full - Trigger full synchronization
+- /api/sync/incremental - Trigger incremental synchronization
+- /api/sync/safe - Trigger sync with concurrency protection
 - /api/sync/status - Get current sync status
+- /api/sync/statistics - Get comprehensive sync statistics
+- /api/sync/history - Get sync history
+- /api/sync/needs-sync - Check if full sync is required
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -38,7 +45,7 @@ class SyncTriggerResponse(BaseModel):
 
     status: str
     message: str
-    statistics: Optional[dict] = None
+    statistics: Optional[dict[str, Any]] = None
 
 
 class SyncErrorResponse(BaseModel):
@@ -46,6 +53,55 @@ class SyncErrorResponse(BaseModel):
 
     error: str
     detail: str
+
+
+class SyncHistoryEntry(BaseModel):
+    """Model for a single sync history entry."""
+
+    id: str
+    status: str
+    last_sync_at: Optional[str] = None
+    has_sync_token: bool
+    error_message: Optional[str] = None
+
+
+class SyncHistoryResponse(BaseModel):
+    """Response model for sync history."""
+
+    history: list[SyncHistoryEntry]
+
+
+class ContactStatistics(BaseModel):
+    """Model for contact statistics."""
+
+    total: int
+    active: int
+    deleted: int
+
+
+class SyncInfo(BaseModel):
+    """Model for sync info."""
+
+    last_sync_at: Optional[str] = None
+    status: str
+    has_sync_token: bool
+    error_message: Optional[str] = None
+
+
+class SyncStatisticsResponse(BaseModel):
+    """Response model for comprehensive sync statistics."""
+
+    contacts: ContactStatistics
+    phone_numbers: int
+    sync: SyncInfo
+    sync_history: dict[str, int]
+
+
+class ClearHistoryResponse(BaseModel):
+    """Response model for clear history operation."""
+
+    status: str
+    deleted_count: int
 
 
 @router.get("/status", response_model=SyncStatusResponse)
@@ -276,7 +332,7 @@ async def trigger_auto_sync(
 
 
 @router.get("/needs-sync")
-async def check_needs_sync(db: Session = Depends(get_db)) -> dict:
+async def check_needs_sync(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Check if a full sync is required.
 
     A full sync is needed if:
@@ -304,4 +360,142 @@ async def check_needs_sync(db: Session = Depends(get_db)) -> dict:
         "needs_full_sync": needs_sync,
         "reason": reason,
     }
+
+
+@router.post("/safe", response_model=SyncTriggerResponse)
+async def trigger_safe_sync(
+    db: Session = Depends(get_db),
+) -> SyncTriggerResponse | JSONResponse:
+    """Trigger sync with concurrency protection.
+
+    Uses a lock to prevent multiple simultaneous sync operations.
+    If a sync is already in progress, returns HTTP 409 Conflict.
+
+    This is the recommended endpoint for triggering syncs from background
+    jobs or scheduled tasks.
+
+    Prerequisites:
+    - User must be authenticated with Google OAuth
+
+    Returns:
+        SyncTriggerResponse with sync result and statistics
+
+    Raises:
+        HTTPException 401: If not authenticated with Google
+        JSONResponse 409: If a sync is already in progress
+        HTTPException 500: If sync fails due to server error
+    """
+    # Check authentication
+    if not is_authenticated():
+        logger.warning("Safe sync requested but user is not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated with Google. Please complete OAuth setup first.",
+        )
+
+    try:
+        sync_service = get_sync_service(db)
+        result = sync_service.safe_auto_sync()
+
+        if result.get("status") == "skipped":
+            return JSONResponse(
+                status_code=409,  # Conflict
+                content=result,
+            )
+
+        return SyncTriggerResponse(
+            status=result["status"],
+            message=result["message"],
+            statistics=result.get("statistics"),
+        )
+
+    except CredentialsError as e:
+        logger.error("Credentials error during safe sync: %s", e)
+        raise HTTPException(
+            status_code=401,
+            detail=str(e),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Safe sync failed with unexpected error")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sync failed: {str(e)}",
+        )
+
+
+@router.get("/history", response_model=SyncHistoryResponse)
+async def get_sync_history(
+    limit: int = Query(default=10, ge=1, le=100, description="Number of records"),
+    db: Session = Depends(get_db),
+) -> SyncHistoryResponse:
+    """Get sync history.
+
+    Returns a list of recent sync operations with their status,
+    timestamps, and any error messages.
+
+    Args:
+        limit: Number of sync records to return (1-100, default 10)
+
+    Returns:
+        SyncHistoryResponse with list of sync history entries
+    """
+    sync_service = get_sync_service(db)
+    history = sync_service.get_sync_history(limit)
+    return SyncHistoryResponse(
+        history=[SyncHistoryEntry(**entry) for entry in history]
+    )
+
+
+@router.get("/statistics", response_model=SyncStatisticsResponse)
+async def get_sync_statistics(
+    db: Session = Depends(get_db),
+) -> SyncStatisticsResponse:
+    """Get comprehensive sync statistics.
+
+    Returns detailed statistics about:
+    - Contacts: total, active, and deleted counts
+    - Phone numbers: total count
+    - Sync: last sync info, status, token availability
+    - Sync history: count by status
+
+    Returns:
+        SyncStatisticsResponse with all statistics
+    """
+    sync_service = get_sync_service(db)
+    stats = sync_service.get_sync_statistics()
+    return SyncStatisticsResponse(
+        contacts=ContactStatistics(**stats["contacts"]),
+        phone_numbers=stats["phone_numbers"],
+        sync=SyncInfo(**stats["sync"]),
+        sync_history=stats["sync_history"],
+    )
+
+
+@router.delete("/history", response_model=ClearHistoryResponse)
+async def clear_sync_history(
+    keep_latest: bool = Query(
+        default=True,
+        description="Keep the most recent sync state",
+    ),
+    db: Session = Depends(get_db),
+) -> ClearHistoryResponse:
+    """Clear sync history.
+
+    Removes old sync state records from the database.
+    Optionally keeps the most recent sync state.
+
+    Args:
+        keep_latest: If True, keep the most recent sync state (default True)
+
+    Returns:
+        ClearHistoryResponse with number of deleted records
+    """
+    sync_service = get_sync_service(db)
+    deleted_count = sync_service.clear_sync_history(keep_latest)
+    return ClearHistoryResponse(
+        status="success",
+        deleted_count=deleted_count,
+    )
 

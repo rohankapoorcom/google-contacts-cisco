@@ -534,3 +534,289 @@ class TestNeedsSyncEndpoint:
         data = response.json()
         assert data["needs_full_sync"] is False
         assert data["reason"] == "Incremental sync available"
+
+
+class TestSafeSyncEndpoint:
+    """Test POST /api/sync/safe endpoint."""
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    def test_safe_sync_not_authenticated(self, mock_auth, client):
+        """Test safe sync fails when not authenticated."""
+        mock_auth.return_value = False
+
+        response = client.post("/api/sync/safe")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Not authenticated" in data["detail"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_safe_sync_success(self, mock_get_service, mock_auth, client):
+        """Test successful safe sync."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.safe_auto_sync.return_value = {
+            "status": "success",
+            "message": "Full sync completed successfully",
+            "statistics": {
+                "total_fetched": 100,
+                "created": 100,
+                "updated": 0,
+                "deleted": 0,
+                "errors": 0,
+                "pages": 5,
+            },
+        }
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/safe")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["statistics"]["total_fetched"] == 100
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_safe_sync_already_in_progress(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test safe sync returns 409 when already in progress."""
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.safe_auto_sync.return_value = {
+            "status": "skipped",
+            "message": "Sync already in progress",
+            "statistics": {},
+        }
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/safe")
+
+        assert response.status_code == 409
+        data = response.json()
+        assert data["status"] == "skipped"
+        assert "already in progress" in data["message"]
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_safe_sync_credentials_error(
+        self, mock_get_service, mock_auth, client
+    ):
+        """Test safe sync with credentials error."""
+        from google_contacts_cisco.services.google_client import CredentialsError
+
+        mock_auth.return_value = True
+        mock_service = Mock()
+        mock_service.safe_auto_sync.side_effect = CredentialsError("Token invalid")
+        mock_get_service.return_value = mock_service
+
+        response = client.post("/api/sync/safe")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert "Token invalid" in data["detail"]
+
+
+class TestSyncHistoryEndpoint:
+    """Test GET /api/sync/history endpoint."""
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_sync_history_empty(self, mock_get_service, client):
+        """Test sync history when no syncs have occurred."""
+        mock_service = Mock()
+        mock_service.get_sync_history.return_value = []
+        mock_get_service.return_value = mock_service
+
+        response = client.get("/api/sync/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["history"] == []
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_sync_history_returns_records(self, mock_get_service, client):
+        """Test sync history returns records."""
+        mock_service = Mock()
+        mock_service.get_sync_history.return_value = [
+            {
+                "id": "abc-123",
+                "status": "idle",
+                "last_sync_at": "2024-01-15T10:30:00Z",
+                "has_sync_token": True,
+                "error_message": None,
+            },
+            {
+                "id": "def-456",
+                "status": "error",
+                "last_sync_at": "2024-01-15T09:00:00Z",
+                "has_sync_token": False,
+                "error_message": "Connection failed",
+            },
+        ]
+        mock_get_service.return_value = mock_service
+
+        response = client.get("/api/sync/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["history"]) == 2
+        assert data["history"][0]["status"] == "idle"
+        assert data["history"][1]["error_message"] == "Connection failed"
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_sync_history_with_limit(self, mock_get_service, client):
+        """Test sync history respects limit parameter."""
+        mock_service = Mock()
+        mock_service.get_sync_history.return_value = [
+            {
+                "id": "abc-123",
+                "status": "idle",
+                "last_sync_at": "2024-01-15T10:30:00Z",
+                "has_sync_token": True,
+                "error_message": None,
+            },
+        ]
+        mock_get_service.return_value = mock_service
+
+        response = client.get("/api/sync/history?limit=5")
+
+        assert response.status_code == 200
+        mock_service.get_sync_history.assert_called_with(5)
+
+    def test_sync_history_limit_validation(self, client):
+        """Test sync history validates limit parameter."""
+        # Limit too low
+        response = client.get("/api/sync/history?limit=0")
+        assert response.status_code == 422
+
+        # Limit too high
+        response = client.get("/api/sync/history?limit=200")
+        assert response.status_code == 422
+
+
+class TestSyncStatisticsEndpoint:
+    """Test GET /api/sync/statistics endpoint."""
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_sync_statistics_empty(self, mock_get_service, client):
+        """Test sync statistics when no data exists."""
+        mock_service = Mock()
+        mock_service.get_sync_statistics.return_value = {
+            "contacts": {
+                "total": 0,
+                "active": 0,
+                "deleted": 0,
+            },
+            "phone_numbers": 0,
+            "sync": {
+                "last_sync_at": None,
+                "status": "never_synced",
+                "has_sync_token": False,
+                "error_message": None,
+            },
+            "sync_history": {},
+        }
+        mock_get_service.return_value = mock_service
+
+        response = client.get("/api/sync/statistics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["contacts"]["total"] == 0
+        assert data["sync"]["status"] == "never_synced"
+        assert data["sync_history"] == {}
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_sync_statistics_with_data(self, mock_get_service, client):
+        """Test sync statistics with data."""
+        mock_service = Mock()
+        mock_service.get_sync_statistics.return_value = {
+            "contacts": {
+                "total": 100,
+                "active": 95,
+                "deleted": 5,
+            },
+            "phone_numbers": 150,
+            "sync": {
+                "last_sync_at": "2024-01-15T10:30:00Z",
+                "status": "idle",
+                "has_sync_token": True,
+                "error_message": None,
+            },
+            "sync_history": {
+                "idle": 5,
+                "error": 1,
+            },
+        }
+        mock_get_service.return_value = mock_service
+
+        response = client.get("/api/sync/statistics")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["contacts"]["total"] == 100
+        assert data["contacts"]["active"] == 95
+        assert data["contacts"]["deleted"] == 5
+        assert data["phone_numbers"] == 150
+        assert data["sync"]["status"] == "idle"
+        assert data["sync_history"]["idle"] == 5
+
+
+class TestClearHistoryEndpoint:
+    """Test DELETE /api/sync/history endpoint."""
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_clear_history_keep_latest(self, mock_get_service, client):
+        """Test clearing history while keeping latest."""
+        mock_service = Mock()
+        mock_service.clear_sync_history.return_value = 5
+        mock_get_service.return_value = mock_service
+
+        response = client.delete("/api/sync/history?keep_latest=true")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["deleted_count"] == 5
+        mock_service.clear_sync_history.assert_called_with(True)
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_clear_history_delete_all(self, mock_get_service, client):
+        """Test clearing all history."""
+        mock_service = Mock()
+        mock_service.clear_sync_history.return_value = 10
+        mock_get_service.return_value = mock_service
+
+        response = client.delete("/api/sync/history?keep_latest=false")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["deleted_count"] == 10
+        mock_service.clear_sync_history.assert_called_with(False)
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_clear_history_default_keeps_latest(self, mock_get_service, client):
+        """Test default behavior keeps latest."""
+        mock_service = Mock()
+        mock_service.clear_sync_history.return_value = 3
+        mock_get_service.return_value = mock_service
+
+        response = client.delete("/api/sync/history")
+
+        assert response.status_code == 200
+        mock_service.clear_sync_history.assert_called_with(True)
+
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_clear_history_empty(self, mock_get_service, client):
+        """Test clearing empty history."""
+        mock_service = Mock()
+        mock_service.clear_sync_history.return_value = 0
+        mock_get_service.return_value = mock_service
+
+        response = client.delete("/api/sync/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["deleted_count"] == 0

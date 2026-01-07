@@ -12,6 +12,7 @@ from .api.routes import router as auth_router
 from .api.sync import router as sync_router
 from .config import settings
 from .config_utils import print_configuration_summary, validate_configuration
+from .services.scheduler import start_sync_scheduler, stop_sync_scheduler
 
 # Configure logging
 logging.basicConfig(
@@ -43,11 +44,22 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Ensure required directories exist
     settings.ensure_directories()
+
+    # Start sync scheduler if configured
+    if settings.sync_scheduler_enabled:
+        start_sync_scheduler(settings.sync_interval_minutes)
+        logger.info(
+            "Sync scheduler started (interval: %d minutes)",
+            settings.sync_interval_minutes,
+        )
+
     logger.info("Application startup complete")
 
     yield
 
     # Shutdown
+    # Stop sync scheduler if running
+    stop_sync_scheduler()
     logger.info("Shutting down %s", settings.app_name)
 
 

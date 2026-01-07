@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     sync_batch_size: int = 100  # Number of contacts to process per batch
     sync_delay_seconds: float = 0.1  # Delay between API requests
 
+    # Sync Scheduler Settings (optional)
+    sync_scheduler_enabled: bool = False  # Enable background sync scheduler
+    sync_interval_minutes: int = 60  # Sync interval in minutes (min 5)
+
     # Search Settings
     search_results_limit: int = 50  # Max search results to return
 
@@ -107,6 +111,16 @@ class Settings(BaseSettings):
         """Validate search results limit is reasonable."""
         if not 1 <= v <= 500:
             raise ValueError("Search results limit must be between 1 and 500")
+        return v
+
+    @field_validator("sync_interval_minutes")
+    @classmethod
+    def validate_sync_interval(cls, v: int) -> int:
+        """Validate sync interval is reasonable (minimum 5 minutes)."""
+        if not 5 <= v <= 1440:
+            raise ValueError(
+                "Sync interval must be between 5 and 1440 minutes (24 hours)"
+            )
         return v
 
     @property
