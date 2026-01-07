@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator
 from fastapi import FastAPI
 
 from ._version import __version__
+from .api.google import router as google_router
 from .api.routes import router as auth_router
 from .config import settings
 from .config_utils import print_configuration_summary, validate_configuration
@@ -59,6 +60,7 @@ app = FastAPI(
 
 # Include API routers
 app.include_router(auth_router)
+app.include_router(google_router)
 
 
 @app.get("/")
