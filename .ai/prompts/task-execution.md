@@ -264,7 +264,181 @@ Detailed notes here..."
 git log -1 --stat
 ```
 
-### 8. Final Checklist
+### 8. Pull Request Phase
+
+**Objective**: Create a pull request for code review and integration
+
+#### PR Creation Guidelines
+
+After committing your changes, create a pull request to merge your feature branch into the main branch. Use the GitHub MCP tools to create the PR programmatically.
+
+#### Prerequisites
+
+Before creating a PR:
+- [ ] All changes are committed locally
+- [ ] Branch has been pushed to remote repository
+- [ ] All tests pass locally
+- [ ] Code quality checks pass (linter, type checker)
+- [ ] Task file has been updated with completion status
+
+#### Push Branch to Remote
+
+```bash
+# Push branch to remote (first time)
+git push -u origin task/{task-number}-{description}
+
+# Or if already tracking
+git push
+```
+
+#### PR Title Format
+
+Follow the same convention as commit messages:
+
+```
+<type>(<scope>): <short summary>
+```
+
+**Examples**:
+- `feat(auth): implement OAuth 2.0 authentication with Google`
+- `feat(db): setup database with SQLAlchemy and Alembic`
+- `fix(oauth): handle token refresh race condition`
+
+#### PR Description Template
+
+Create a comprehensive PR description that includes:
+
+```markdown
+## Overview
+
+Brief description of what this PR accomplishes and which task it implements.
+
+## Changes
+
+### [Module/Component Name]
+- ✅ Feature or change 1
+- ✅ Feature or change 2
+- ✅ Feature or change 3
+
+### [Another Module/Component]
+- ✅ Additional changes
+
+### Features
+- Key feature 1
+- Key feature 2
+- Key feature 3
+
+## Testing
+
+- ✅ **X comprehensive unit tests** covering [what]
+- ✅ **Y% code coverage** for [modules]
+- ✅ Tests for success paths, error handling, and edge cases
+- ✅ All [N] project tests pass
+
+### Test Coverage
+- What is tested
+- Edge cases covered
+- Integration scenarios
+
+## Quality Checks
+
+- ✅ All tests pass ([N]/[N])
+- ✅ Code coverage: X% (exceeds 80% requirement)
+- ✅ Ruff linter: All checks pass
+- ✅ Mypy type checking: No issues found
+- ✅ Follows project coding standards
+
+## Security
+
+- Security consideration 1
+- Security consideration 2
+
+## Related
+
+- Implements: `.ai/planning/tasks/{task-number}-{task-name}.md`
+- Dependencies: Task X, Task Y ✅
+
+## Next Steps
+
+After merge, this enables:
+- Next task or feature
+- Related functionality
+```
+
+#### Creating the PR with GitHub MCP
+
+Use the `mcp_github_create_pull_request` tool:
+
+**Required Parameters**:
+- `owner`: Repository owner (e.g., "rohankapoorcom")
+- `repo`: Repository name (e.g., "google-contacts-cisco")
+- `title`: PR title following conventional commit format
+- `head`: Feature branch name (e.g., "task/04-oauth-implementation")
+- `base`: Base branch (typically "main" or "master")
+
+**Optional Parameters**:
+- `body`: Detailed PR description (use template above)
+- `draft`: Set to `true` if PR is work-in-progress
+
+**Example**:
+```python
+mcp_github_create_pull_request(
+    owner="rohankapoorcom",
+    repo="google-contacts-cisco",
+    title="feat(auth): implement OAuth 2.0 authentication with Google",
+    head="task/04-oauth-implementation",
+    base="main",
+    body="[PR description using template above]",
+    draft=False
+)
+```
+
+#### Getting Repository Information
+
+If you need to determine the repository owner and name:
+
+```bash
+# Get remote URL
+git remote -v
+
+# Extract owner/repo from URL like:
+# origin  git@github.com:owner/repo.git
+# or
+# origin  https://github.com/owner/repo.git
+```
+
+#### PR Best Practices
+
+1. **Clear Title**: Use conventional commit format, be specific
+2. **Comprehensive Description**: Include all relevant details
+3. **Link to Task**: Reference the task file being implemented
+4. **Test Results**: Include test counts and coverage percentages
+5. **Quality Metrics**: Show that all checks pass
+6. **Dependencies**: List prerequisite tasks and their status
+7. **Next Steps**: Explain what this PR enables
+
+#### PR Checklist
+
+Before creating the PR:
+- [ ] Branch name follows convention: `task/{number}-{description}`
+- [ ] All commits follow conventional commit format
+- [ ] PR title matches commit message style
+- [ ] PR description is comprehensive and follows template
+- [ ] All tests pass and coverage meets requirements
+- [ ] Code quality checks pass
+- [ ] Task file updated with completion status
+- [ ] No sensitive data in code or commits
+- [ ] Branch is pushed to remote
+
+#### After PR Creation
+
+- [ ] Verify PR was created successfully
+- [ ] Check that PR description renders correctly
+- [ ] Confirm base and head branches are correct
+- [ ] Note the PR number and URL for reference
+- [ ] Update task file with PR link (optional)
+
+### 9. Final Checklist
 
 Before considering the task complete:
 
@@ -277,7 +451,9 @@ Before considering the task complete:
 - [ ] Linters and type checkers passing
 - [ ] Task file updated with completion status
 - [ ] Changes committed with descriptive message
-- [ ] Ready to proceed to next task or create PR
+- [ ] Branch pushed to remote repository
+- [ ] Pull request created (if applicable)
+- [ ] Ready to proceed to next task
 
 ---
 
@@ -382,6 +558,8 @@ A task is successfully completed when:
 ✅ Code reviewed for quality and security  
 ✅ Task file updated with completion status  
 ✅ Changes committed with descriptive message  
+✅ Branch pushed to remote repository  
+✅ Pull request created (if applicable)  
 ✅ No known bugs or issues remaining  
 
 ---
@@ -390,11 +568,13 @@ A task is successfully completed when:
 
 After completing a task:
 
-1. **Review the Task Index**: Check what tasks are now unblocked
-2. **Plan Next Task**: Identify the next task in the dependency chain
-3. **Take a Break**: Complex tasks are mentally demanding
-4. **Share Knowledge**: Document any insights or learnings
-5. **Consider PR Creation**: When a logical milestone is reached
+1. **Create Pull Request**: Use GitHub MCP tools to create a PR for code review
+2. **Review the Task Index**: Check what tasks are now unblocked
+3. **Plan Next Task**: Identify the next task in the dependency chain
+4. **Take a Break**: Complex tasks are mentally demanding
+5. **Share Knowledge**: Document any insights or learnings
+
+**Note**: You can create a PR after each task completion, or wait for logical milestones (e.g., after completing a phase). Use your judgment based on project workflow.
 
 ---
 
@@ -413,7 +593,7 @@ After completing a task:
 When you're ready to execute a task:
 
 1. Specify which task you're working on (e.g., "Task 02: Database Setup")
-2. Follow the 8-step execution workflow above
+2. Follow the 9-step execution workflow above
 3. Use the task file as your primary implementation guide
 4. Maintain high code quality and test coverage standards
 5. Mark the task complete when all criteria are satisfied
