@@ -280,4 +280,3 @@ class TestPrintConfigurationSummary:
         print_configuration_summary(settings)
         captured = capsys.readouterr()
         assert "Max Entries Per Page: 64" in captured.out
-

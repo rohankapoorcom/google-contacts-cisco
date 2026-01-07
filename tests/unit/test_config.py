@@ -334,4 +334,3 @@ class TestSettingsModelConfig:
         monkeypatch.setenv("debug", "true")
         settings = Settings()
         assert settings.debug is True
-
