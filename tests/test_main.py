@@ -1,32 +1,36 @@
 """Test main application."""
 
-import pytest
-from httpx import AsyncClient, ASGITransport
+from fastapi.testclient import TestClient
 
 from google_contacts_cisco.main import app
 from google_contacts_cisco._version import __version__
+from google_contacts_cisco.config import settings
 
 
-@pytest.mark.asyncio
-async def test_root():
-    """Test root endpoint."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        response = await client.get("/")
-        assert response.status_code == 200
-        assert response.json() == {"message": "Google Contacts Cisco Directory API"}
+client = TestClient(app)
 
 
-@pytest.mark.asyncio
-async def test_health():
-    """Test health check endpoint."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
-        response = await client.get("/health")
-        assert response.status_code == 200
-        assert response.json() == {"status": "healthy"}
+def test_root():
+    """Test root endpoint returns app name and version."""
+    response = client.get("/")
+    assert response.status_code == 200
+    data = response.json()
+    assert "message" in data
+    assert settings.app_name in data["message"]
+    assert "version" in data
+    assert data["version"] == __version__
+
+
+def test_health():
+    """Test health check endpoint returns status and config info."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "version" in data
+    assert "debug" in data
+    assert "config_valid" in data
+    assert "config_errors" in data
 
 
 def test_version():
