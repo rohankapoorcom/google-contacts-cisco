@@ -37,6 +37,9 @@ dev = [
     "types-requests>=2.31.0",
 ]
 
+[tool.setuptools]
+packages = ["google_contacts_cisco"]
+
 [tool.setuptools.dynamic]
 version = {attr = "google_contacts_cisco._version.__version__"}
 
