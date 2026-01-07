@@ -9,6 +9,9 @@ from typing import Optional
 
 from ..config import settings
 
+# Default log format used across the application
+DEFAULT_LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
 
 def get_logger(name: str) -> logging.Logger:
     """Get logger instance.
@@ -30,9 +33,7 @@ def get_logger(name: str) -> logging.Logger:
         handler.setLevel(getattr(logging, settings.log_level.upper()))
 
         # Format
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter(DEFAULT_LOG_FORMAT)
         handler.setFormatter(formatter)
 
         logger.addHandler(handler)
@@ -51,12 +52,10 @@ def configure_root_logger(
         format_string: Log format string (defaults to standard format)
     """
     level = level or settings.log_level
-    default_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    format_string = format_string or default_format
+    format_string = format_string or DEFAULT_LOG_FORMAT
 
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=format_string,
         handlers=[logging.StreamHandler(sys.stdout)],
     )
-

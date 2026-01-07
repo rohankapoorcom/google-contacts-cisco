@@ -201,7 +201,7 @@ class GoogleContactsClient:
                         "Sync token expired. A full sync is required."
                     ) from e
                 else:
-                    logger.error("Error listing connections: %s", e)
+                    logger.exception("Error listing connections")
                     raise
 
     def get_person(self, resource_name: str) -> dict[str, Any]:
@@ -227,8 +227,8 @@ class GoogleContactsClient:
             )
             logger.debug("Retrieved person: %s", resource_name)
             return person
-        except HttpError as e:
-            logger.error("Error getting person %s: %s", resource_name, e)
+        except HttpError:
+            logger.exception("Error getting person %s", resource_name)
             raise
 
     def test_connection(self) -> bool:
@@ -249,11 +249,10 @@ class GoogleContactsClient:
                 pageSize=1,
                 personFields="names",
             ).execute()
-
             logger.info("Successfully connected to Google People API")
             return True
-        except HttpError as e:
-            logger.error("Connection test failed: %s", e)
+        except HttpError:
+            logger.exception("Connection test failed")
             raise
 
     def get_total_connections_count(self) -> int:
@@ -273,12 +272,11 @@ class GoogleContactsClient:
                 pageSize=1,
                 personFields="names",
             ).execute()
-
             total: int = response.get("totalItems", 0) or response.get("totalPeople", 0)
             logger.debug("Total connections count: %d", total)
             return total
-        except HttpError as e:
-            logger.error("Error getting connection count: %s", e)
+        except HttpError:
+            logger.exception("Error getting connection count")
             raise
 
     def _make_request_with_retry(
@@ -320,7 +318,7 @@ class GoogleContactsClient:
                     time.sleep(backoff)
                     return self._make_request_with_retry(request_func, retry_count + 1)
                 else:
-                    logger.error(
+                    logger.exception(
                         "Max retries exceeded for rate limit after %d attempts",
                         self.max_retries,
                     )
@@ -341,7 +339,7 @@ class GoogleContactsClient:
                     time.sleep(backoff)
                     return self._make_request_with_retry(request_func, retry_count + 1)
                 else:
-                    logger.error(
+                    logger.exception(
                         "Max retries exceeded for server error after %d attempts",
                         self.max_retries,
                     )
@@ -352,12 +350,12 @@ class GoogleContactsClient:
                     raise ServerError(msg) from e
 
             elif status == 401:  # Unauthorized
-                logger.error("Unauthorized - credentials may have expired")
+                logger.exception("Unauthorized - credentials may have expired")
                 raise
 
             else:
                 # Other errors - don't retry
-                logger.error("API error %d: %s", status, e)
+                logger.exception("API error %d", status)
                 raise
 
 
@@ -378,4 +376,3 @@ def get_google_client(
         CredentialsError: If no valid credentials available
     """
     return GoogleContactsClient(credentials)
-

@@ -8,7 +8,6 @@ This module tests the Google API endpoints including:
 from unittest.mock import Mock, patch
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from google_contacts_cisco.api import google as google_module

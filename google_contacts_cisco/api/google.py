@@ -4,7 +4,6 @@ This module provides FastAPI endpoints for interacting with the Google People AP
 - /api/test-connection - Test connection to Google People API
 """
 
-import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -17,8 +16,9 @@ from ..services.google_client import (
     ServerError,
     get_google_client,
 )
+from ..utils.logger import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api", tags=["google"])
 
@@ -31,21 +31,9 @@ class TestConnectionResponse(BaseModel):
     total_contacts: Optional[int] = None
 
 
-class ErrorResponse(BaseModel):
-    """Response model for errors."""
-
-    status: str
-    message: str
-    error_type: str
-
-
 @router.get(
     "/test-connection",
     response_model=TestConnectionResponse,
-    responses={
-        401: {"model": ErrorResponse, "description": "Not authenticated"},
-        500: {"model": ErrorResponse, "description": "Connection test failed"},
-    },
 )
 async def test_google_connection() -> TestConnectionResponse:
     """Test connection to Google People API.
@@ -73,7 +61,8 @@ async def test_google_connection() -> TestConnectionResponse:
         # Try to get connection count
         try:
             total = client.get_total_connections_count()
-        except Exception:
+        except Exception as e:
+            logger.debug("Could not retrieve total contacts count: %s", e)
             total = None
 
         logger.info("Connection test successful")
@@ -83,27 +72,26 @@ async def test_google_connection() -> TestConnectionResponse:
             total_contacts=total,
         )
     except CredentialsError as e:
-        logger.error("Credentials error during connection test: %s", e)
+        logger.exception("Credentials error during connection test")
         raise HTTPException(
             status_code=401,
             detail=str(e),
-        )
+        ) from e
     except RateLimitError as e:
-        logger.error("Rate limit during connection test: %s", e)
+        logger.exception("Rate limit during connection test")
         raise HTTPException(
             status_code=429,
             detail=f"Rate limit exceeded: {e}",
-        )
+        ) from e
     except ServerError as e:
-        logger.error("Server error during connection test: %s", e)
+        logger.exception("Server error during connection test")
         raise HTTPException(
             status_code=502,
             detail=f"Google API server error: {e}",
-        )
+        ) from e
     except Exception as e:
         logger.exception("Unexpected error during connection test")
         raise HTTPException(
             status_code=500,
             detail=f"Connection test failed: {e}",
-        )
-
+        ) from e

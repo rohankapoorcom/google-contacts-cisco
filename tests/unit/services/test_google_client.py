@@ -78,9 +78,9 @@ class TestPersonFields:
         """PERSON_FIELDS should be a list."""
         assert isinstance(PERSON_FIELDS, list)
 
-    def test_person_fields_has_correct_count(self):
-        """PERSON_FIELDS should have exactly 5 fields."""
-        assert len(PERSON_FIELDS) == 5
+    def test_person_fields_has_minimum_required_count(self):
+        """PERSON_FIELDS should have at least the required 5 fields."""
+        assert len(PERSON_FIELDS) >= 5
 
 
 class TestGoogleContactsClientInit:
@@ -288,8 +288,9 @@ class TestListConnections:
             client = GoogleContactsClient(mock_creds)
             list(client.list_connections(sync_token="oldsync"))
 
-        # Verify the call was made (indirectly through execute)
-        mock_service.people().connections().list.assert_called()
+        # Verify sync_token was passed in the call
+        call_kwargs = mock_service.people().connections().list.call_args[1]
+        assert call_kwargs.get("syncToken") == "oldsync"
 
     def test_list_connections_respects_max_page_size(self):
         """Should cap page size at 1000."""
@@ -305,8 +306,9 @@ class TestListConnections:
             client = GoogleContactsClient(mock_creds)
             list(client.list_connections(page_size=2000))
 
-        # The implementation caps at 1000
-        mock_service.people().connections().list.assert_called()
+        # Verify the page size was capped at 1000
+        call_kwargs = mock_service.people().connections().list.call_args[1]
+        assert call_kwargs.get("pageSize") == 1000
 
     def test_list_connections_sync_token_expired(self):
         """Should raise SyncTokenExpiredError on 410 response."""

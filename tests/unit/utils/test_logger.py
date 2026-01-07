@@ -14,7 +14,26 @@ from unittest.mock import Mock, patch
 import pytest
 
 from google_contacts_cisco.utils import logger as logger_module
-from google_contacts_cisco.utils.logger import configure_root_logger, get_logger
+from google_contacts_cisco.utils.logger import (
+    DEFAULT_LOG_FORMAT,
+    configure_root_logger,
+    get_logger,
+)
+
+
+class TestDefaultLogFormat:
+    """Test DEFAULT_LOG_FORMAT constant."""
+
+    def test_default_log_format_is_string(self):
+        """DEFAULT_LOG_FORMAT should be a string."""
+        assert isinstance(DEFAULT_LOG_FORMAT, str)
+
+    def test_default_log_format_includes_required_fields(self):
+        """DEFAULT_LOG_FORMAT should include required logging fields."""
+        assert "%(asctime)s" in DEFAULT_LOG_FORMAT
+        assert "%(name)s" in DEFAULT_LOG_FORMAT
+        assert "%(levelname)s" in DEFAULT_LOG_FORMAT
+        assert "%(message)s" in DEFAULT_LOG_FORMAT
 
 
 class TestGetLogger:
@@ -159,12 +178,9 @@ class TestGetLogger:
 
         handler = result.handlers[0]
         assert handler.formatter is not None
-        # Check format string contains expected elements
+        # Check format string matches the DEFAULT_LOG_FORMAT constant
         format_str = handler.formatter._fmt
-        assert "%(asctime)s" in format_str
-        assert "%(name)s" in format_str
-        assert "%(levelname)s" in format_str
-        assert "%(message)s" in format_str
+        assert format_str == DEFAULT_LOG_FORMAT
 
 
 class TestConfigureRootLogger:
