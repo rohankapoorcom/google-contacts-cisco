@@ -65,6 +65,9 @@ const totalPages = computed(() => {
 })
 
 const paginationInfo = computed(() => {
+  if (totalContacts.value === 0) {
+    return { start: 0, end: 0, total: 0 }
+  }
   const start = (currentPage.value - 1) * pageSize + 1
   const end = Math.min(currentPage.value * pageSize, totalContacts.value)
   return { start, end, total: totalContacts.value }
@@ -212,6 +215,13 @@ function closeContactModal() {
 
 onMounted(() => {
   loadContacts()
+})
+
+onUnmounted(() => {
+  // Clear debounce timer to prevent stale updates after unmount
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
 })
 
 // Watch for view mode changes in other tabs
