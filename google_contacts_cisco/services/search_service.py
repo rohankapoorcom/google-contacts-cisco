@@ -4,6 +4,7 @@ This module provides full-text search functionality for contacts
 by name and phone number with pagination support.
 """
 
+from dataclasses import dataclass
 from typing import List, Optional
 
 from sqlalchemy import func, or_, select
@@ -15,6 +16,14 @@ from ..utils.logger import get_logger
 from ..utils.phone_utils import PhoneNumberNormalizer
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class SearchResult:
+    """Search result with match metadata."""
+    contact: Contact
+    match_type: str  # 'exact', 'prefix', 'substring', 'phone'
+    match_field: str  # field that matched ('display_name', 'phone_number', etc.)
 
 
 class SearchService:
@@ -37,6 +46,102 @@ class SearchService:
         """
         self.db = db
         self.phone_normalizer = phone_normalizer or PhoneNumberNormalizer("US")
+
+    def search(
+        self,
+        query: str,
+        limit: int = 50,
+    ) -> List[SearchResult]:
+        """Search contacts with match metadata.
+
+        Searches across display_name, given_name, family_name, and phone numbers,
+        returning results with match type and match field information.
+
+        Args:
+            query: Search query string
+            limit: Maximum number of results (default: 50)
+
+        Returns:
+            List of SearchResult objects with contact and match metadata
+        """
+        if not query or not query.strip():
+            logger.warning("Empty search query provided")
+            return []
+
+        search_term = query.strip().lower()
+        logger.info("Searching contacts for: %s", search_term)
+
+        results: List[SearchResult] = []
+
+        # Check if query looks like a phone number (contains mostly digits)
+        digit_count = sum(c.isdigit() for c in search_term)
+        is_phone_query = digit_count >= 3
+
+        if is_phone_query:
+            # Search phone numbers
+            phone_results = self.search_by_phone(search_term, limit=limit)
+            for contact in phone_results:
+                results.append(SearchResult(
+                    contact=contact,
+                    match_type='phone',
+                    match_field='phone_number'
+                ))
+        else:
+            # Search by name
+            contacts = self.search_by_name(search_term, limit=limit)
+            for contact in contacts:
+                match_type, match_field = self._determine_match_type(contact, search_term)
+                results.append(SearchResult(
+                    contact=contact,
+                    match_type=match_type,
+                    match_field=match_field
+                ))
+
+        logger.info("Found %d contacts matching: %s", len(results), search_term)
+        return results[:limit]  # Ensure we don't exceed limit
+
+    def _determine_match_type(self, contact: Contact, query: str) -> tuple[str, str]:
+        """Determine the type and field of match for a contact.
+
+        Args:
+            contact: Contact that matched
+            query: Search query (lowercase)
+
+        Returns:
+            Tuple of (match_type, match_field)
+        """
+        # Check display_name
+        if contact.display_name:
+            display_lower = contact.display_name.lower()
+            if display_lower == query:
+                return ('exact', 'display_name')
+            if display_lower.startswith(query):
+                return ('prefix', 'display_name')
+            if query in display_lower:
+                return ('substring', 'display_name')
+
+        # Check given_name
+        if contact.given_name:
+            given_lower = contact.given_name.lower()
+            if given_lower == query:
+                return ('exact', 'given_name')
+            if given_lower.startswith(query):
+                return ('prefix', 'given_name')
+            if query in given_lower:
+                return ('substring', 'given_name')
+
+        # Check family_name
+        if contact.family_name:
+            family_lower = contact.family_name.lower()
+            if family_lower == query:
+                return ('exact', 'family_name')
+            if family_lower.startswith(query):
+                return ('prefix', 'family_name')
+            if query in family_lower:
+                return ('substring', 'family_name')
+
+        # Default to substring match
+        return ('substring', 'display_name')
 
     def search_contacts(
         self,

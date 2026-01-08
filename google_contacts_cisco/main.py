@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from ._version import __version__
+from .api.contacts import router as contacts_router
 from .api.directory_routes import router as directory_router
 from .api.google import router as google_router
 from .api.routes import router as auth_router
@@ -98,6 +99,7 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(auth_router)
+app.include_router(contacts_router)
 app.include_router(directory_router)
 app.include_router(google_router)
 app.include_router(sync_router)

@@ -285,3 +285,190 @@ class ContactRepository:
 
         return []
 
+    def get_contacts(
+        self,
+        limit: int = 30,
+        offset: int = 0,
+        sort_by_recent: bool = False
+    ) -> List[Contact]:
+        """Get contacts with pagination and sorting.
+
+        Args:
+            limit: Maximum number of contacts to return
+            offset: Number of contacts to skip
+            sort_by_recent: If True, sort by updated_at desc; otherwise by display_name
+
+        Returns:
+            List of active contacts
+        """
+        query = (
+            self.db.query(Contact)
+            .filter(Contact.deleted == False)  # noqa: E712
+        )
+
+        if sort_by_recent:
+            query = query.order_by(Contact.updated_at.desc())
+        else:
+            query = query.order_by(Contact.display_name.asc())
+
+        return query.offset(offset).limit(limit).all()
+
+    def get_contacts_by_letter_group(
+        self,
+        letter: str,
+        limit: int = 30,
+        offset: int = 0,
+        sort_by_recent: bool = False
+    ) -> List[Contact]:
+        """Get contacts filtered by first letter of display name.
+
+        Args:
+            letter: First letter to filter by (A-Z) or '#' for non-alphabetic
+            limit: Maximum number of contacts to return
+            offset: Number of contacts to skip
+            sort_by_recent: If True, sort by updated_at desc; otherwise by display_name
+
+        Returns:
+            List of active contacts starting with the specified letter
+        """
+        query = (
+            self.db.query(Contact)
+            .filter(Contact.deleted == False)  # noqa: E712
+        )
+
+        if letter == "#":
+            # Match contacts starting with non-alphabetic characters
+            query = query.filter(
+                ~Contact.display_name.op('~')('^[A-Za-z]')
+            )
+        else:
+            # Match contacts starting with specific letter (case-insensitive)
+            query = query.filter(
+                Contact.display_name.ilike(f"{letter}%")
+            )
+
+        if sort_by_recent:
+            query = query.order_by(Contact.updated_at.desc())
+        else:
+            query = query.order_by(Contact.display_name.asc())
+
+        return query.offset(offset).limit(limit).all()
+
+    def count_contacts(self) -> int:
+        """Count all active (non-deleted) contacts.
+
+        Returns:
+            Number of active contacts
+        """
+        return (
+            self.db.query(Contact)
+            .filter(Contact.deleted == False)  # noqa: E712
+            .count()
+        )
+
+    def count_contacts_by_letter_group(self, letter: str) -> int:
+        """Count contacts by first letter of display name.
+
+        Args:
+            letter: First letter to filter by (A-Z) or '#' for non-alphabetic
+
+        Returns:
+            Number of active contacts starting with the specified letter
+        """
+        query = (
+            self.db.query(Contact)
+            .filter(Contact.deleted == False)  # noqa: E712
+        )
+
+        if letter == "#":
+            # Count contacts starting with non-alphabetic characters
+            query = query.filter(
+                ~Contact.display_name.op('~')('^[A-Za-z]')
+            )
+        else:
+            # Count contacts starting with specific letter (case-insensitive)
+            query = query.filter(
+                Contact.display_name.ilike(f"{letter}%")
+            )
+
+        return query.count()
+
+    def get_contact_by_id(self, contact_id: str) -> Optional[Contact]:
+        """Get contact by ID (string format).
+
+        Args:
+            contact_id: Contact ID as string
+
+        Returns:
+            Contact or None if not found
+        """
+        try:
+            uuid_id = UUID(contact_id)
+            return (
+                self.db.query(Contact)
+                .filter(
+                    Contact.id == uuid_id,
+                    Contact.deleted == False  # noqa: E712
+                )
+                .first()
+            )
+        except (ValueError, AttributeError):
+            return None
+
+    def get_contact_statistics(self) -> dict:
+        """Get aggregate contact statistics.
+
+        Returns:
+            Dictionary with contact statistics including:
+            - total_contacts: Total number of active contacts
+            - contacts_with_phone: Contacts with at least one phone number
+            - contacts_with_email: Contacts with at least one email
+            - total_phone_numbers: Total phone number records
+            - total_emails: Total email records
+        """
+        from ..models.contact import EmailAddress
+
+        total_contacts = self.count_contacts()
+
+        # Count contacts with phone numbers
+        contacts_with_phone = (
+            self.db.query(Contact.id)
+            .join(PhoneNumber)
+            .filter(Contact.deleted == False)  # noqa: E712
+            .distinct()
+            .count()
+        )
+
+        # Count contacts with emails
+        contacts_with_email = (
+            self.db.query(Contact.id)
+            .join(EmailAddress)
+            .filter(Contact.deleted == False)  # noqa: E712
+            .distinct()
+            .count()
+        )
+
+        # Count total phone numbers
+        total_phone_numbers = (
+            self.db.query(PhoneNumber)
+            .join(Contact)
+            .filter(Contact.deleted == False)  # noqa: E712
+            .count()
+        )
+
+        # Count total emails
+        total_emails = (
+            self.db.query(EmailAddress)
+            .join(Contact)
+            .filter(Contact.deleted == False)  # noqa: E712
+            .count()
+        )
+
+        return {
+            "total_contacts": total_contacts,
+            "contacts_with_phone": contacts_with_phone,
+            "contacts_with_email": contacts_with_email,
+            "total_phone_numbers": total_phone_numbers,
+            "total_emails": total_emails,
+        }
+
