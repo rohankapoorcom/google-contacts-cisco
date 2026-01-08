@@ -341,7 +341,7 @@ class TestAuthRefreshEndpoint:
 
                 response = client.post("/auth/refresh")
 
-                assert response.status_code == 500
+                assert response.status_code == 401
                 assert "failed" in response.json()["detail"].lower()
 
 

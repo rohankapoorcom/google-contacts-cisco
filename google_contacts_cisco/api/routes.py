@@ -17,13 +17,13 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from pydantic import BaseModel
 
 from ..auth.oauth import (
     CredentialsNotConfiguredError,
     TokenExchangeError,
-    TokenRefreshError,
     get_auth_status,
     get_authorization_url,
     get_credentials,
@@ -283,7 +283,7 @@ async def auth_refresh() -> RefreshResponse:
     except HTTPException:
         # Re-raise HTTP exceptions to preserve status codes
         raise
-    except TokenRefreshError as e:
+    except RefreshError as e:
         logger.exception("Token refresh failed")
         raise HTTPException(
             status_code=401,
