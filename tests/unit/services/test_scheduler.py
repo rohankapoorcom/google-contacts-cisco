@@ -7,8 +7,6 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from google_contacts_cisco.services.scheduler import (
     SyncScheduler,
     get_sync_scheduler,
@@ -235,27 +233,35 @@ class TestSchedulerIntegration:
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
 
+        # Use a threading Event to signal when sync has been called
+        sync_called_event = threading.Event()
+
+        def safe_auto_sync_with_signal():
+            sync_called_event.set()
+            return {"status": "success"}
+
         mock_sync_service = MagicMock()
-        mock_sync_service.safe_auto_sync.return_value = {"status": "success"}
+        mock_sync_service.safe_auto_sync.side_effect = safe_auto_sync_with_signal
         mock_get_sync_service.return_value = mock_sync_service
 
         # Create scheduler with very short interval for testing
         scheduler = SyncScheduler(interval_minutes=1)
         scheduler._stop_event = threading.Event()
 
-        # Override interval for testing
-        scheduler.interval_minutes = 0  # Immediate for test
+        # Override interval for testing (0 means immediate execution)
+        scheduler.interval_minutes = 0
 
         scheduler.start()
 
         try:
-            # Wait for at least one sync to occur
-            time.sleep(0.3)
+            # Wait for sync to be called with a reasonable timeout
+            sync_called = sync_called_event.wait(timeout=2.0)
+            assert sync_called, "Scheduler did not call sync within timeout"
         finally:
             scheduler.stop()
 
-        # Should have called sync at least once
-        # Note: The scheduler waits before first run, so we may not see calls
-        # in a short test. This is testing the mechanism, not timing.
+        # Verify sync was called at least once
+        assert mock_sync_service.safe_auto_sync.called
+        assert mock_db.close.called
 
 
