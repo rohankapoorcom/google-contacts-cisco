@@ -14,6 +14,7 @@ from ._version import __version__
 from .api.directory_routes import router as directory_router
 from .api.google import router as google_router
 from .api.routes import router as auth_router
+from .api.search_routes import router as search_router
 from .api.sync import router as sync_router
 from .config import settings
 from .config_utils import print_configuration_summary, validate_configuration
@@ -100,6 +101,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(directory_router)
 app.include_router(google_router)
+app.include_router(search_router)
 app.include_router(sync_router)
 
 
