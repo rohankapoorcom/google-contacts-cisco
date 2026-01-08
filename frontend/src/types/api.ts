@@ -90,16 +90,15 @@ export interface SyncStatus {
 }
 
 /**
- * OAuth authentication status.
+ * OAuth authentication status (matches backend AuthStatusResponse).
  */
 export interface OAuthStatus {
   authenticated: boolean
-  token_info?: {
-    valid: boolean
-    expired: boolean
-    expiry?: string
-    scopes: string[]
-  }
+  has_token_file: boolean
+  credentials_valid: boolean
+  credentials_expired: boolean
+  has_refresh_token: boolean
+  scopes: string[]
 }
 
 /**
