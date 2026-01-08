@@ -85,7 +85,12 @@ def calculate_module_coverage(files: Dict[str, Dict]) -> Dict[str, Dict]:
         # Extract module name
         parts = filepath.split("/")
         if len(parts) >= 2:
-            module = f"google_contacts_cisco.{parts[1]}"
+            # Check if parts[1] is a file (has .py extension) or directory
+            module_part = parts[1]
+            if module_part.endswith(".py"):
+                # Remove .py extension for root-level files
+                module_part = module_part[:-3]
+            module = f"google_contacts_cisco.{module_part}"
         else:
             module = "google_contacts_cisco"
         

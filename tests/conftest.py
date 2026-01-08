@@ -214,10 +214,6 @@ def sample_sync_state(db_session) -> SyncState:
         sync_token="test_sync_token_123",
         sync_status=SyncStatus.IDLE,
         last_sync_at=datetime.now(timezone.utc),
-        total_contacts=100,
-        new_contacts=10,
-        updated_contacts=5,
-        deleted_contacts=2,
     )
     db_session.add(sync_state)
     db_session.commit()
