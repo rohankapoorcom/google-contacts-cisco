@@ -1,10 +1,13 @@
 """API routes for OAuth authentication.
 
 This module provides FastAPI endpoints for the OAuth 2.0 flow:
-- /auth/google - Initiate OAuth flow
+- /auth/google - Initiate OAuth flow (redirect)
+- /auth/url - Get OAuth URL (JSON response)
 - /auth/callback - Handle OAuth callback
 - /auth/status - Check authentication status
+- /auth/refresh - Refresh OAuth token
 - /auth/revoke - Revoke credentials
+- /auth/disconnect - Alias for revoke
 """
 
 import logging
@@ -19,11 +22,14 @@ from pydantic import BaseModel
 from ..auth.oauth import (
     CredentialsNotConfiguredError,
     TokenExchangeError,
+    TokenRefreshError,
     get_auth_status,
     get_authorization_url,
+    get_credentials,
     handle_oauth_callback,
     is_authenticated,
     revoke_credentials,
+    save_credentials,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +48,22 @@ class AuthStatusResponse(BaseModel):
     scopes: list[str]
 
 
+class AuthUrlResponse(BaseModel):
+    """Response model for OAuth URL request."""
+
+    auth_url: str
+    state: Optional[str] = None
+
+
 class RevokeResponse(BaseModel):
     """Response model for credential revocation."""
+
+    success: bool
+    message: str
+
+
+class RefreshResponse(BaseModel):
+    """Response model for token refresh."""
 
     success: bool
     message: str
@@ -56,6 +76,40 @@ class AuthErrorResponse(BaseModel):
     detail: str
 
 
+@router.get("/url", response_model=AuthUrlResponse)
+async def auth_url(
+    redirect_uri: Optional[str] = Query(
+        None, description="Optional custom redirect URI after auth"
+    ),
+) -> AuthUrlResponse:
+    """Get OAuth authorization URL (JSON response).
+
+    Returns the Google OAuth URL for the frontend to redirect to.
+
+    Args:
+        redirect_uri: Optional URI to redirect to after successful auth
+
+    Returns:
+        JSON response with authorization URL
+
+    Raises:
+        HTTPException: If OAuth credentials are not configured
+    """
+    try:
+        # Store redirect URI in state if provided (for post-auth redirect)
+        state = redirect_uri if redirect_uri else None
+        auth_url, generated_state = get_authorization_url(state=state)
+        logger.info("Generated OAuth URL for client-side redirect")
+        return AuthUrlResponse(auth_url=auth_url, state=generated_state)
+    except CredentialsNotConfiguredError as e:
+        logger.error("OAuth credentials not configured: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Google OAuth credentials not configured. "
+            "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+        )
+
+
 @router.get("/google", response_class=RedirectResponse)
 async def auth_google(
     request: Request,
@@ -63,7 +117,7 @@ async def auth_google(
         None, description="Optional custom redirect URI after auth"
     ),
 ) -> RedirectResponse:
-    """Initiate Google OAuth flow.
+    """Initiate Google OAuth flow (server-side redirect).
 
     Redirects the user to Google's consent screen to authorize the application.
 
@@ -185,6 +239,67 @@ async def auth_status() -> AuthStatusResponse:
     return AuthStatusResponse(**status)
 
 
+@router.post("/refresh", response_model=RefreshResponse)
+async def auth_refresh() -> RefreshResponse:
+    """Refresh the OAuth access token.
+
+    Uses the stored refresh token to obtain a new access token.
+
+    Returns:
+        RefreshResponse indicating success or failure
+
+    Raises:
+        HTTPException: If not authenticated or refresh fails
+    """
+    if not is_authenticated():
+        logger.warning("Refresh requested but no active credentials")
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated. No credentials to refresh.",
+        )
+
+    try:
+        creds = get_credentials()
+        if not creds:
+            raise HTTPException(
+                status_code=401,
+                detail="Could not retrieve credentials",
+            )
+
+        if not creds.refresh_token:
+            raise HTTPException(
+                status_code=400,
+                detail="No refresh token available. Please re-authenticate.",
+            )
+
+        # Force refresh even if not expired
+        from google.auth.transport.requests import Request
+
+        creds.refresh(Request())
+        save_credentials(creds)
+
+        logger.info("Access token refreshed successfully")
+        return RefreshResponse(
+            success=True,
+            message="Access token refreshed successfully",
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions to preserve status codes
+        raise
+    except TokenRefreshError as e:
+        logger.error("Token refresh failed: %s", e)
+        raise HTTPException(
+            status_code=401,
+            detail=f"Token refresh failed: {e}",
+        )
+    except Exception as e:
+        logger.exception("Unexpected error during token refresh")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Token refresh failed: {e}",
+        )
+
+
 @router.post("/revoke", response_model=RevokeResponse)
 async def auth_revoke() -> RevokeResponse:
     """Revoke authentication and delete tokens.
@@ -216,6 +331,19 @@ async def auth_revoke() -> RevokeResponse:
             success=False,
             message="Credential revocation may have failed",
         )
+
+
+@router.post("/disconnect", response_model=RevokeResponse)
+async def auth_disconnect() -> RevokeResponse:
+    """Disconnect from Google (alias for revoke).
+
+    Attempts to revoke the OAuth token with Google's servers,
+    then deletes the local token file.
+
+    Returns:
+        RevokeResponse indicating success or failure
+    """
+    return await auth_revoke()
 
 
 def _render_success_page(redirect_to: str = "/") -> str:

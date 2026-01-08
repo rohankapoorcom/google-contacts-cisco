@@ -1,24 +1,79 @@
 """Unit tests for OAuth API endpoints.
 
 This module tests all OAuth-related API endpoints:
-- GET /auth/google - Initiate OAuth flow
+- GET /auth/url - Get OAuth authorization URL (JSON)
+- GET /auth/google - Initiate OAuth flow (redirect)
 - GET /auth/callback - Handle OAuth callback
 - GET /auth/status - Check authentication status
+- POST /auth/refresh - Refresh OAuth token
 - POST /auth/revoke - Revoke credentials
+- POST /auth/disconnect - Disconnect (alias for revoke)
 """
 
 from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from google.auth.exceptions import RefreshError
 
 from google_contacts_cisco.auth.oauth import (
     CredentialsNotConfiguredError,
     TokenExchangeError,
+    TokenRefreshError,
 )
 from google_contacts_cisco.main import app
 
 client = TestClient(app)
+
+
+class TestAuthUrlEndpoint:
+    """Test GET /auth/url endpoint."""
+
+    def test_auth_url_returns_json(self):
+        """Should return JSON with OAuth URL."""
+        with patch(
+            "google_contacts_cisco.api.routes.get_authorization_url"
+        ) as mock_get_url:
+            mock_get_url.return_value = ("https://accounts.google.com/auth", "state123")
+
+            response = client.get("/auth/url")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "auth_url" in data
+            assert "accounts.google.com" in data["auth_url"]
+            assert data["state"] == "state123"
+
+    def test_auth_url_with_redirect_uri(self):
+        """Should pass redirect_uri as state parameter."""
+        with patch(
+            "google_contacts_cisco.api.routes.get_authorization_url"
+        ) as mock_get_url:
+            mock_get_url.return_value = (
+                "https://accounts.google.com/auth",
+                "/dashboard",
+            )
+
+            response = client.get("/auth/url?redirect_uri=/dashboard")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "auth_url" in data
+            mock_get_url.assert_called_once_with(state="/dashboard")
+
+    def test_auth_url_credentials_not_configured(self):
+        """Should return 500 when credentials not configured."""
+        with patch(
+            "google_contacts_cisco.api.routes.get_authorization_url"
+        ) as mock_get_url:
+            mock_get_url.side_effect = CredentialsNotConfiguredError(
+                "Credentials not set"
+            )
+
+            response = client.get("/auth/url")
+
+            assert response.status_code == 500
+            assert "GOOGLE_CLIENT_ID" in response.json()["detail"]
 
 
 class TestAuthGoogleEndpoint:
@@ -220,6 +275,76 @@ class TestAuthStatusEndpoint:
             assert data["credentials_expired"] is True
 
 
+class TestAuthRefreshEndpoint:
+    """Test POST /auth/refresh endpoint."""
+
+    def test_auth_refresh_success(self):
+        """Should refresh token successfully."""
+        mock_creds = Mock()
+        mock_creds.refresh_token = "test_refresh_token"
+        mock_creds.token = "new_access_token"
+        mock_creds.to_json.return_value = '{"token": "new_access_token"}'
+
+        with patch("google_contacts_cisco.api.routes.is_authenticated") as mock_auth:
+            mock_auth.return_value = True
+            with patch(
+                "google_contacts_cisco.api.routes.get_credentials"
+            ) as mock_get_creds:
+                mock_get_creds.return_value = mock_creds
+                with patch("google_contacts_cisco.api.routes.save_credentials"):
+                    response = client.post("/auth/refresh")
+
+                    assert response.status_code == 200
+                    data = response.json()
+                    assert data["success"] is True
+                    assert "refreshed" in data["message"]
+
+    def test_auth_refresh_not_authenticated(self):
+        """Should return 401 when not authenticated."""
+        with patch("google_contacts_cisco.api.routes.is_authenticated") as mock_auth:
+            mock_auth.return_value = False
+
+            response = client.post("/auth/refresh")
+
+            assert response.status_code == 401
+            assert "Not authenticated" in response.json()["detail"]
+
+    def test_auth_refresh_no_refresh_token(self):
+        """Should return 400 when no refresh token available."""
+        mock_creds = Mock()
+        mock_creds.refresh_token = None
+
+        with patch("google_contacts_cisco.api.routes.is_authenticated") as mock_auth:
+            mock_auth.return_value = True
+            with patch(
+                "google_contacts_cisco.api.routes.get_credentials"
+            ) as mock_get_creds:
+                mock_get_creds.return_value = mock_creds
+
+                response = client.post("/auth/refresh")
+
+                assert response.status_code == 400
+                assert "No refresh token" in response.json()["detail"]
+
+    def test_auth_refresh_failure(self):
+        """Should handle refresh failure gracefully."""
+        mock_creds = Mock()
+        mock_creds.refresh_token = "test_refresh_token"
+        mock_creds.refresh.side_effect = RefreshError("Refresh failed")
+
+        with patch("google_contacts_cisco.api.routes.is_authenticated") as mock_auth:
+            mock_auth.return_value = True
+            with patch(
+                "google_contacts_cisco.api.routes.get_credentials"
+            ) as mock_get_creds:
+                mock_get_creds.return_value = mock_creds
+
+                response = client.post("/auth/refresh")
+
+                assert response.status_code == 500
+                assert "failed" in response.json()["detail"].lower()
+
+
 class TestAuthRevokeEndpoint:
     """Test POST /auth/revoke endpoint."""
 
@@ -265,6 +390,36 @@ class TestAuthRevokeEndpoint:
                 assert response.status_code == 200
                 data = response.json()
                 assert data["success"] is False
+
+
+class TestAuthDisconnectEndpoint:
+    """Test POST /auth/disconnect endpoint."""
+
+    def test_auth_disconnect_success(self):
+        """Should disconnect successfully (alias for revoke)."""
+        with patch("google_contacts_cisco.api.routes.is_authenticated") as mock_auth:
+            mock_auth.return_value = True
+            with patch(
+                "google_contacts_cisco.api.routes.revoke_credentials"
+            ) as mock_revoke:
+                mock_revoke.return_value = True
+
+                response = client.post("/auth/disconnect")
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["success"] is True
+
+    def test_auth_disconnect_no_credentials(self):
+        """Should return success=False when no credentials."""
+        with patch("google_contacts_cisco.api.routes.is_authenticated") as mock_auth:
+            mock_auth.return_value = False
+
+            response = client.post("/auth/disconnect")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is False
 
 
 class TestAuthEndpointIntegration:
@@ -333,10 +488,13 @@ class TestOpenAPISchema:
         schema = response.json()
 
         paths = schema["paths"]
+        assert "/auth/url" in paths
         assert "/auth/google" in paths
         assert "/auth/callback" in paths
         assert "/auth/status" in paths
+        assert "/auth/refresh" in paths
         assert "/auth/revoke" in paths
+        assert "/auth/disconnect" in paths
 
     def test_auth_tag_in_schema(self):
         """Auth endpoints should have authentication tag."""
