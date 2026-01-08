@@ -76,17 +76,82 @@ export interface SearchResponse {
  * Synchronization status from the sync service.
  */
 export interface SyncStatus {
-  status: 'idle' | 'running' | 'completed' | 'error'
-  progress: number
-  current_operation: string
-  stats: {
-    added: number
-    updated: number
-    deleted: number
-  }
-  started_at?: string
-  completed_at?: string
-  error?: string
+  status: string
+  last_sync_at?: string
+  has_sync_token: boolean
+  error_message?: string
+  contact_count: number
+  total_contacts: number
+}
+
+/**
+ * Sync trigger response (after triggering a sync).
+ */
+export interface SyncTriggerResponse {
+  status: string
+  message: string
+  statistics?: SyncStatistics
+}
+
+/**
+ * Statistics from a sync operation.
+ */
+export interface SyncStatistics {
+  total_fetched: number
+  created: number
+  updated: number
+  deleted: number
+  errors: number
+  pages: number
+  sync_type: string
+  duration_seconds: number
+}
+
+/**
+ * Sync history entry.
+ */
+export interface SyncHistoryEntry {
+  id: string
+  status: string
+  last_sync_at?: string
+  has_sync_token: boolean
+  error_message?: string
+}
+
+/**
+ * Sync history response.
+ */
+export interface SyncHistoryResponse {
+  history: SyncHistoryEntry[]
+}
+
+/**
+ * Contact statistics for sync.
+ */
+export interface ContactStatistics {
+  total: number
+  active: number
+  deleted: number
+}
+
+/**
+ * Sync info for statistics.
+ */
+export interface SyncInfoStats {
+  last_sync_at?: string
+  status: string
+  has_sync_token: boolean
+  error_message?: string
+}
+
+/**
+ * Comprehensive sync statistics response.
+ */
+export interface SyncStatisticsResponse {
+  contacts: ContactStatistics
+  phone_numbers: number
+  sync: SyncInfoStats
+  sync_history: Record<string, number>
 }
 
 /**
