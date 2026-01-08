@@ -910,3 +910,219 @@ class TestGetSyncServiceFactory:
 
         assert service._google_client is mock_google_client
 
+
+class TestSafeAutoSync:
+    """Test safe_auto_sync with concurrency protection."""
+
+    def test_safe_auto_sync_success(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test safe_auto_sync completes successfully."""
+        mock_response = {
+            "connections": [
+                {
+                    "resourceName": "people/c1",
+                    "names": [{"displayName": "Test Contact"}],
+                    "phoneNumbers": [],
+                },
+            ],
+            "nextSyncToken": "token123",
+        }
+        mock_google_client.list_connections.return_value = [mock_response]
+
+        result = sync_service.safe_auto_sync()
+
+        assert result["status"] == "success"
+        assert "Full sync completed" in result["message"]
+        assert result["statistics"]["total_fetched"] == 1
+
+    def test_safe_auto_sync_returns_error_on_failure(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test safe_auto_sync returns error status on failure."""
+        mock_google_client.list_connections.side_effect = Exception("API Error")
+
+        result = sync_service.safe_auto_sync()
+
+        assert result["status"] == "error"
+        assert "API Error" in result["message"]
+        assert result["statistics"] == {}
+
+
+class TestGetSyncHistory:
+    """Test sync history retrieval."""
+
+    def test_get_sync_history_empty(self, sync_service):
+        """Test sync history when no syncs have occurred."""
+        history = sync_service.get_sync_history()
+
+        assert history == []
+
+    def test_get_sync_history_returns_records(
+        self, sync_service, db_session
+    ):
+        """Test sync history returns multiple records."""
+        # Create sync history
+        state1 = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="token1",
+            last_sync_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+        )
+        state2 = SyncState(
+            sync_status=SyncStatus.ERROR,
+            sync_token=None,
+            last_sync_at=datetime(2024, 1, 1, 11, 0, 0, tzinfo=timezone.utc),
+            error_message="Test error",
+        )
+        db_session.add_all([state1, state2])
+        db_session.commit()
+
+        history = sync_service.get_sync_history(limit=10)
+
+        assert len(history) == 2
+        # Most recent first
+        assert history[0]["status"] == "error"
+        assert history[0]["error_message"] == "Test error"
+        assert history[1]["status"] == "idle"
+        assert history[1]["has_sync_token"] is True
+
+    def test_get_sync_history_respects_limit(
+        self, sync_service, db_session
+    ):
+        """Test sync history respects limit parameter."""
+        # Create multiple sync states
+        for i in range(5):
+            state = SyncState(
+                sync_status=SyncStatus.IDLE,
+                sync_token=f"token{i}",
+                last_sync_at=datetime(2024, 1, 1, i, 0, 0, tzinfo=timezone.utc),
+            )
+            db_session.add(state)
+        db_session.commit()
+
+        history = sync_service.get_sync_history(limit=3)
+
+        assert len(history) == 3
+
+
+class TestGetSyncStatistics:
+    """Test sync statistics retrieval."""
+
+    def test_get_sync_statistics_empty(self, sync_service):
+        """Test statistics when no data exists."""
+        stats = sync_service.get_sync_statistics()
+
+        assert stats["contacts"]["total"] == 0
+        assert stats["contacts"]["active"] == 0
+        assert stats["contacts"]["deleted"] == 0
+        assert stats["phone_numbers"] == 0
+        assert stats["sync"]["status"] == "never_synced"
+        assert stats["sync"]["has_sync_token"] is False
+        assert stats["sync_history"] == {}
+
+    def test_get_sync_statistics_with_data(
+        self, sync_service, db_session, mock_google_client
+    ):
+        """Test statistics with contacts and sync history."""
+        # Create contacts
+        from google_contacts_cisco.models import Contact, PhoneNumber
+
+        active_contact = Contact(
+            resource_name="people/c1",
+            display_name="Active",
+            deleted=False,
+        )
+        deleted_contact = Contact(
+            resource_name="people/c2",
+            display_name="Deleted",
+            deleted=True,
+        )
+        db_session.add_all([active_contact, deleted_contact])
+        db_session.flush()
+
+        # Add phone number with required fields
+        phone = PhoneNumber(
+            contact_id=active_contact.id,
+            value="+15551234567",
+            display_value="(555) 123-4567",
+            type="mobile",
+        )
+        db_session.add(phone)
+
+        # Create sync state
+        sync_state = SyncState(
+            sync_status=SyncStatus.IDLE,
+            sync_token="token123",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        stats = sync_service.get_sync_statistics()
+
+        assert stats["contacts"]["total"] == 2
+        assert stats["contacts"]["active"] == 1
+        assert stats["contacts"]["deleted"] == 1
+        assert stats["phone_numbers"] == 1
+        assert stats["sync"]["status"] == "idle"
+        assert stats["sync"]["has_sync_token"] is True
+        assert stats["sync_history"]["idle"] == 1
+
+
+class TestClearSyncHistory:
+    """Test clearing sync history."""
+
+    def test_clear_sync_history_keep_latest(
+        self, sync_service, db_session
+    ):
+        """Test clearing history while keeping latest."""
+        # Create multiple sync states
+        state1 = SyncState(
+            sync_status=SyncStatus.IDLE,
+            last_sync_at=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+        )
+        state2 = SyncState(
+            sync_status=SyncStatus.IDLE,
+            last_sync_at=datetime(2024, 1, 1, 11, 0, 0, tzinfo=timezone.utc),
+        )
+        state3 = SyncState(
+            sync_status=SyncStatus.IDLE,
+            last_sync_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        db_session.add_all([state1, state2, state3])
+        db_session.commit()
+
+        deleted_count = sync_service.clear_sync_history(keep_latest=True)
+
+        assert deleted_count == 2
+        remaining = db_session.query(SyncState).all()
+        assert len(remaining) == 1
+        # Should keep the latest (12:00) - compare without timezone since SQLite strips it
+        assert remaining[0].last_sync_at.replace(tzinfo=None) == datetime(
+            2024, 1, 1, 12, 0, 0
+        )
+
+    def test_clear_sync_history_delete_all(
+        self, sync_service, db_session
+    ):
+        """Test clearing all history."""
+        # Create sync states
+        for i in range(3):
+            state = SyncState(
+                sync_status=SyncStatus.IDLE,
+                last_sync_at=datetime(2024, 1, 1, i, 0, 0, tzinfo=timezone.utc),
+            )
+            db_session.add(state)
+        db_session.commit()
+
+        deleted_count = sync_service.clear_sync_history(keep_latest=False)
+
+        assert deleted_count == 3
+        assert db_session.query(SyncState).count() == 0
+
+    def test_clear_sync_history_empty(self, sync_service, db_session):
+        """Test clearing empty history."""
+        deleted_count = sync_service.clear_sync_history(keep_latest=True)
+
+        assert deleted_count == 0
+

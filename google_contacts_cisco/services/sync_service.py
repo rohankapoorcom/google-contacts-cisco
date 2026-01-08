@@ -7,12 +7,15 @@ synchronization of contacts from Google to the local database.
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from threading import Lock
+from typing import Any, Optional
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..api.schemas import GoogleConnectionsResponse, GooglePerson
-from ..models.sync_state import SyncStatus
+from ..models.phone_number import PhoneNumber
+from ..models.sync_state import SyncState, SyncStatus
 from ..repositories.contact_repository import ContactRepository
 from ..repositories.sync_repository import SyncRepository
 from ..services.contact_transformer import transform_google_person_to_contact
@@ -24,6 +27,9 @@ from ..services.google_client import (
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Module-level lock for preventing concurrent syncs
+_sync_lock = Lock()
 
 
 @dataclass
@@ -471,6 +477,170 @@ class SyncService:
         else:
             logger.info("No sync token available, performing full sync")
             return self.full_sync(batch_size, page_delay)
+
+    def safe_auto_sync(
+        self,
+        batch_size: int = 100,
+        page_delay: float = 0.1,
+    ) -> dict[str, Any]:
+        """Perform auto sync with locking to prevent concurrent syncs.
+
+        Uses a thread-safe lock to ensure only one sync operation runs at a time.
+        If a sync is already in progress, returns immediately with a skipped status.
+
+        Args:
+            batch_size: Number of contacts to commit per batch
+            page_delay: Delay between API page requests in seconds
+
+        Returns:
+            Dict with status, message, and statistics (if sync was performed)
+        """
+        if not _sync_lock.acquire(blocking=False):
+            logger.warning("Sync already in progress, skipping")
+            return {
+                "status": "skipped",
+                "message": "Sync already in progress",
+                "statistics": {},
+            }
+
+        try:
+            stats = self.auto_sync(batch_size, page_delay)
+            sync_type = stats.sync_type.capitalize()
+            return {
+                "status": "success",
+                "message": f"{sync_type} sync completed successfully",
+                "statistics": stats.to_dict(),
+            }
+        except Exception as e:
+            logger.exception("Safe auto sync failed")
+            return {
+                "status": "error",
+                "message": str(e),
+                "statistics": {},
+            }
+        finally:
+            _sync_lock.release()
+
+    def get_sync_history(self, limit: int = 10) -> list[dict[str, Any]]:
+        """Get sync history.
+
+        Returns a list of recent sync operations with their status and timestamps.
+
+        Args:
+            limit: Number of sync records to return (default 10)
+
+        Returns:
+            List of sync history records as dictionaries
+        """
+        sync_states = (
+            self.db.query(SyncState)
+            .order_by(SyncState.last_sync_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+        history = []
+        for state in sync_states:
+            history.append({
+                "id": str(state.id),
+                "status": state.sync_status.value,
+                "last_sync_at": (
+                    state.last_sync_at.isoformat() if state.last_sync_at else None
+                ),
+                "has_sync_token": state.sync_token is not None,
+                "error_message": state.error_message,
+            })
+
+        return history
+
+    def get_sync_statistics(self) -> dict[str, Any]:
+        """Get comprehensive sync statistics.
+
+        Provides detailed statistics about contacts, phone numbers, and sync status.
+
+        Returns:
+            Dictionary with sync statistics including:
+            - contacts: total, active, deleted counts
+            - phone_numbers: total count
+            - sync: last sync info, status, token availability
+            - sync_history: count by status
+        """
+        contact_count = self.contact_repo.count_active()
+        total_count = self.contact_repo.count_all()
+        deleted_count = total_count - contact_count
+
+        # Get phone number count
+        phone_count = self.db.query(PhoneNumber).count()
+
+        # Get latest sync
+        latest_sync = self.sync_repo.get_latest_sync_state()
+
+        # Count syncs by status
+        sync_counts = dict(
+            self.db.query(
+                SyncState.sync_status,
+                func.count(SyncState.id),
+            )
+            .group_by(SyncState.sync_status)
+            .all()
+        )
+        # Convert enum keys to string values
+        sync_counts_str = {k.value: v for k, v in sync_counts.items()}
+
+        return {
+            "contacts": {
+                "total": total_count,
+                "active": contact_count,
+                "deleted": deleted_count,
+            },
+            "phone_numbers": phone_count,
+            "sync": {
+                "last_sync_at": (
+                    latest_sync.last_sync_at.isoformat()
+                    if latest_sync and latest_sync.last_sync_at
+                    else None
+                ),
+                "status": (
+                    latest_sync.sync_status.value if latest_sync else "never_synced"
+                ),
+                "has_sync_token": (
+                    latest_sync.sync_token is not None if latest_sync else False
+                ),
+                "error_message": latest_sync.error_message if latest_sync else None,
+            },
+            "sync_history": sync_counts_str,
+        }
+
+    def clear_sync_history(self, keep_latest: bool = True) -> int:
+        """Clear old sync history.
+
+        Removes sync state records from the database, optionally keeping
+        the most recent one.
+
+        Args:
+            keep_latest: If True, keep the most recent sync state (default True)
+
+        Returns:
+            Number of sync states deleted
+        """
+        if keep_latest:
+            # Keep only the latest sync state
+            latest = self.sync_repo.get_latest_sync_state()
+            if latest:
+                count = (
+                    self.db.query(SyncState)
+                    .filter(SyncState.id != latest.id)
+                    .delete()
+                )
+            else:
+                count = 0
+        else:
+            # Delete all sync states
+            count = self.db.query(SyncState).delete()
+
+        self.db.commit()
+        logger.info("Cleared %d sync history records", count)
+        return count
 
 
 def get_sync_service(
