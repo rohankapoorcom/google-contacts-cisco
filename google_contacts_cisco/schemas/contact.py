@@ -7,13 +7,15 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator
+
+from ..utils.phone_utils import get_phone_normalizer
 
 
 class PhoneNumberSchema(BaseModel):
     """Phone number schema for internal use.
 
-    Validates and normalizes phone numbers for storage and search.
+    Validates and normalizes phone numbers to E.164 format for storage and search.
     """
 
     value: str
@@ -21,31 +23,50 @@ class PhoneNumberSchema(BaseModel):
     type: Optional[str] = None
     primary: bool = False
 
-    @field_validator("value", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def validate_phone_number(cls, v: str) -> str:
-        """Validate and normalize phone number.
+    def normalize_phone_number(cls, data):
+        """Normalize phone number to E.164 format.
 
-        Strips all formatting characters (parentheses, dashes, spaces)
-        and keeps only digits and the leading + sign.
+        Uses the phone normalization utility to convert the phone number
+        to E.164 format while preserving the display value.
 
         Args:
-            v: Raw phone number string
+            data: Dictionary with phone number data
 
         Returns:
-            Normalized phone number containing only digits and optional +
+            Dictionary with normalized value and display_value
 
         Raises:
-            ValueError: If the phone number contains no digits
+            ValueError: If the phone number cannot be normalized
         """
-        if not v:
-            raise ValueError("Phone number cannot be empty")
+        if isinstance(data, dict):
+            value = data.get("value")
+            display_value = data.get("display_value")
 
-        # Remove common formatting characters, keep + and digits
-        normalized = "".join(c for c in v if c.isdigit() or c == "+")
-        if not normalized or (normalized == "+" and len(normalized) == 1):
-            raise ValueError("Phone number must contain at least one digit")
-        return normalized
+            if not value:
+                raise ValueError("Phone number cannot be empty")
+
+            normalizer = get_phone_normalizer()
+            normalized, formatted_display = normalizer.normalize(value, display_value)
+
+            if normalized is None:
+                # Fallback to simple digit extraction if normalization fails
+                # This handles edge cases where phonenumbers library can't parse
+                digits = "".join(c for c in value if c.isdigit() or c == "+")
+                if not digits or (digits == "+" and len(digits) == 1):
+                    raise ValueError(
+                        f"Phone number must contain at least one digit: {value}"
+                    )
+                normalized = digits
+
+            # Update the data with normalized values
+            data["value"] = normalized
+            # Use original display_value if provided, otherwise use formatted
+            if not display_value:
+                data["display_value"] = formatted_display
+
+        return data
 
 
 class ContactCreateSchema(BaseModel):
