@@ -115,3 +115,74 @@ class ContactSearchResultSchema(BaseModel):
 
     model_config = {"from_attributes": True}
 
+
+# API Response Schemas
+
+class PhoneNumberResponse(BaseModel):
+    """Phone number response schema for API."""
+
+    id: UUID
+    value: str
+    display_value: str
+    type: Optional[str] = None
+    primary: bool
+
+    model_config = {"from_attributes": True}
+
+
+class EmailAddressResponse(BaseModel):
+    """Email address response schema for API."""
+
+    id: UUID
+    value: str
+    type: Optional[str] = None
+    primary: bool
+
+    model_config = {"from_attributes": True}
+
+
+class ContactResponse(BaseModel):
+    """Contact response schema for API."""
+
+    id: str
+    display_name: str
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    phone_numbers: List[PhoneNumberResponse]
+    email_addresses: List[EmailAddressResponse] = []
+    updated_at: Optional[str] = None
+
+    @classmethod
+    def from_orm(cls, contact):
+        """Create response from ORM model."""
+        # Get email addresses if the relationship exists
+        email_addresses = []
+        if hasattr(contact, 'email_addresses'):
+            email_addresses = [
+                EmailAddressResponse.model_validate(e)
+                for e in contact.email_addresses
+            ]
+
+        return cls(
+            id=str(contact.id),
+            display_name=contact.display_name,
+            given_name=contact.given_name,
+            family_name=contact.family_name,
+            phone_numbers=[
+                PhoneNumberResponse.model_validate(p)
+                for p in contact.phone_numbers
+            ],
+            email_addresses=email_addresses,
+            updated_at=contact.updated_at.isoformat() if contact.updated_at else None
+        )
+
+
+class ContactListResponse(BaseModel):
+    """Paginated contact list response."""
+
+    contacts: List[ContactResponse]
+    total: int
+    offset: int
+    limit: int
+    has_more: bool
+
