@@ -6,6 +6,40 @@ You are conducting a **technical code review** for the **Google Contacts Cisco D
 
 A developer (AI or human) has completed a specific task following the task execution workflow. Your role is to **critically review** the implementation to ensure it meets quality standards, acceptance criteria, and best practices before it can be marked as complete.
 
+## ⚠️ MANDATORY: Start by Identifying the Completed Task
+
+**BEFORE conducting the review, you MUST:**
+
+1. **Identify the completed beads task**:
+   ```bash
+   export BEADS_NO_DAEMON=1
+   bd show <task-id>
+   ```
+   - Review the task description, acceptance criteria, and dependencies
+   - Understand what was supposed to be implemented
+   - Check the current status (should be `in_progress` or `done`)
+
+2. **Review the commits associated with this task**:
+   ```bash
+   git log --oneline --grep="<task-id>" -n 5
+   # Or if task number is in branch name:
+   git log main..HEAD --oneline
+   ```
+
+3. **Understand the context**:
+   - What problem was this task solving?
+   - What were the acceptance criteria?
+   - Were there any special requirements or constraints?
+   - What dependencies did this task have?
+
+**Do not proceed with the review until you have:**
+- ✅ Identified the specific beads task ID
+- ✅ Read the task description and acceptance criteria
+- ✅ Located the commits/changes for this task
+- ✅ Understood the task context and requirements
+
+---
+
 ## Context
 
 ### Original Task Instructions
@@ -14,6 +48,7 @@ The implementation was completed following these instructions:
 - **Task Execution Prompt**: `.ai/prompts/task-execution.md`
 - **Task Index**: `.ai/planning/tasks/00-task-index.md`
 - **Specific Task File**: (provided in the review context)
+- **Beads Task ID**: (identified in the preparation step above)
 
 ### Review Scope
 
@@ -23,6 +58,7 @@ You will be reviewing:
 - Documentation and comments
 - Adherence to project standards
 - Completion of acceptance criteria
+- Alignment with the original beads task requirements
 
 ---
 
@@ -383,10 +419,32 @@ async def sync_contacts(
 
 ## Review Execution Process
 
+### Step 0: Identify the Beads Task (MANDATORY)
+
+```bash
+# Set environment variable
+export BEADS_NO_DAEMON=1
+
+# If you know the task ID
+bd show <task-id>
+
+# If you don't know the task ID, find recently completed/in-progress tasks
+bd list --status in_progress
+bd list --status done | head -5
+
+# Examine the task details
+bd show <task-id>
+# Note: Task ID, description, acceptance criteria, dependencies
+
+# Verify the current branch matches the task
+git branch --show-current
+# Should be something like: task/<number>-<description>
+```
+
 ### Step 1: Prepare for Review
 
 ```bash
-# Check out the branch
+# Check out the branch (if not already on it)
 git checkout task/{number}-{description}
 
 # Review the changes
@@ -440,12 +498,16 @@ Provide your review in this structured format:
 
 ### 📊 Review Summary
 
+**Beads Task ID**: [#task-id]  
 **Task**: [Task Number and Name]  
 **Reviewer**: [Your Name/AI]  
 **Review Date**: [Date]  
+**Branch**: [Branch name]  
 **Commit(s) Reviewed**: [Commit SHA(s)]
 
 **Overall Status**: 🟢 APPROVED | 🟡 APPROVED WITH COMMENTS | 🔴 CHANGES REQUIRED
+
+**Follow-up Tasks Created**: [#task-id1, #task-id2, ...] or [None]
 
 ---
 
@@ -567,6 +629,197 @@ Any other observations, context, or recommendations.
 
 ---
 
+### 🎯 Required Actions - Beads Task Management
+
+**⚠️ COMPLETE THESE STEPS NOW:**
+
+1. **Create beads tasks** for each critical issue identified above
+2. **Create beads tasks** for high-value improvements
+3. **Update the original beads task** (#[original-task-id]) status:
+   - 🟢 APPROVED: Verify task is closed
+   - 🟡 APPROVED WITH COMMENTS: Close task, link follow-ups
+   - 🔴 CHANGES REQUIRED: Keep open, link blocking issues
+4. **Document follow-up tasks** in the original task comments
+
+**Commands to run:**
+```bash
+export BEADS_NO_DAEMON=1
+
+# Create tasks for issues (see examples above)
+bd create --title "..." --body "..." --labels "..."
+
+# Update original task
+bd close <original-task-id>  # or bd comment <original-task-id> --body "..."
+
+# Verify
+bd show <original-task-id> <new-task-id1> <new-task-id2>
+```
+
+**Do not consider the review complete until these tasks are created and linked.**
+
+---
+
+## ⚠️ MANDATORY: Create Beads Tasks for Required Changes
+
+**AFTER completing the review, you MUST:**
+
+### Step 1: Create Tasks for Critical Issues
+
+If you identified any **Critical Issues** (🔴) in your review, create a beads task for EACH issue:
+
+```bash
+export BEADS_NO_DAEMON=1
+bd create --title "Fix: <Brief issue description>" \
+  --body "## Issue from Code Review
+
+**Original Task**: <task-id>
+**Review Date**: <date>
+**File**: <file-path>:<line>
+
+### Problem
+<Detailed description of the issue>
+
+### Impact
+<Why this is critical>
+
+### Solution
+<Specific recommendation to fix>
+
+### Acceptance Criteria
+- [ ] Issue is resolved
+- [ ] Tests added/updated to prevent regression
+- [ ] Code review passed
+
+**Priority**: P0/P1
+**Related to**: <original-task-id>" \
+  --labels "bug,code-review,priority-p0"
+```
+
+### Step 2: Create Tasks for Significant Improvements
+
+For **Suggestions for Improvement** that are HIGH or MEDIUM effort and HIGH value, create tasks:
+
+```bash
+bd create --title "Improve: <Brief improvement description>" \
+  --body "## Improvement from Code Review
+
+**Original Task**: <task-id>
+**Review Date**: <date>
+**File**: <file-path>:<line>
+
+### Current Implementation
+<Description of current implementation>
+
+### Suggested Improvement
+<How it could be improved>
+
+### Benefit
+<Why this improvement is valuable>
+
+### Acceptance Criteria
+- [ ] Improvement implemented
+- [ ] Tests cover the improved functionality
+- [ ] Code review passed
+
+**Effort**: High/Medium
+**Related to**: <original-task-id>" \
+  --labels "enhancement,code-review,tech-debt"
+```
+
+### Step 3: Update Original Task Status
+
+Based on your review decision:
+
+**If APPROVED (🟢):**
+```bash
+# Task should already be closed by the implementer
+bd show <task-id>  # Verify it's closed
+# If not closed, close it:
+bd close <task-id>
+```
+
+**If APPROVED WITH MINOR CHANGES (🟡):**
+```bash
+# Create tasks for the minor changes (as above)
+# Close the original task (work is complete enough)
+bd close <task-id>
+# Link the new tasks to the original
+echo "Created follow-up tasks: <task-ids>" | bd comment <task-id>
+```
+
+**If CHANGES REQUIRED (🔴):**
+```bash
+# DO NOT CLOSE the original task
+# Create tasks for critical issues
+# Comment on the original task
+bd comment <task-id> --body "## Code Review: Changes Required
+
+Critical issues found that must be addressed:
+- Task #<new-task-id>: <brief description>
+- Task #<new-task-id>: <brief description>
+
+See full review details in commit message or PR comments.
+
+Status: Awaiting fixes before approval."
+
+# Update status to indicate rework needed
+bd update <task-id> --status in_progress
+```
+
+### Step 4: Link Tasks Together
+
+Ensure all created tasks reference the original task:
+- Use `**Related to**: <original-task-id>` in task body
+- Use consistent labeling (e.g., `code-review`)
+- Create a paper trail for future reference
+
+### Example Complete Workflow
+
+```bash
+# Review completed, found 2 critical issues and 1 improvement
+
+# Create task for critical issue 1
+bd create --title "Fix: Handle database connection timeout in sync_service" \
+  --body "..." --labels "bug,code-review,priority-p0"
+# Returns: Created task #43
+
+# Create task for critical issue 2
+bd create --title "Fix: Missing validation for phone number format" \
+  --body "..." --labels "bug,code-review,priority-p0"
+# Returns: Created task #44
+
+# Create task for improvement
+bd create --title "Improve: Extract complex XML formatting logic" \
+  --body "..." --labels "enhancement,code-review,tech-debt"
+# Returns: Created task #45
+
+# Comment on original task
+bd comment 42 --body "Code review complete. Created follow-up tasks: #43, #44, #45"
+
+# Update original task (don't close - critical issues need fixing)
+bd update 42 --status in_progress
+
+# Verify tasks created
+bd show 43 44 45
+```
+
+### Requirements Summary
+
+**YOU MUST:**
+- ✅ Create a beads task for EVERY critical issue (🔴)
+- ✅ Create tasks for high-value improvements
+- ✅ Update the original task status appropriately
+- ✅ Link all created tasks back to the original task
+- ✅ Use consistent labeling for tracking
+
+**DO NOT:**
+- ❌ Skip creating tasks for critical issues
+- ❌ Close the original task if critical issues exist
+- ❌ Create tasks for trivial style/formatting issues
+- ❌ Forget to export BEADS_NO_DAEMON=1
+
+---
+
 ## Review Guidelines
 
 ### Be Constructive
@@ -641,14 +894,18 @@ Focus on:
 
 A review is complete when:
 
+✅ **Beads task identified** and reviewed  
 ✅ All 10 dimensions have been evaluated  
 ✅ Ratings assigned for each dimension  
 ✅ Critical issues identified and documented  
 ✅ Suggestions provided where appropriate  
-✅ Acceptance criteria verified  
+✅ Acceptance criteria verified against original beads task  
 ✅ Test coverage confirmed  
 ✅ Final recommendation made  
 ✅ Feedback is clear and actionable  
+✅ **Beads tasks created** for all critical issues and significant improvements  
+✅ **Original beads task status updated** appropriately  
+✅ **Tasks linked together** for traceability  
 
 ---
 
