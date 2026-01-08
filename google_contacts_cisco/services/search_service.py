@@ -220,15 +220,21 @@ class SearchService:
             all_conditions = or_(*name_conditions)
 
         # Count distinct contacts
-        stmt = (
-            select(func.count(func.distinct(Contact.id)))
-            .select_from(Contact)
-            .where(~Contact.deleted)
-            .where(all_conditions)
-        )
-
         if phone_conditions:
-            stmt = stmt.outerjoin(Contact.phone_numbers)
+            stmt = (
+                select(func.count(func.distinct(Contact.id)))
+                .select_from(Contact)
+                .outerjoin(Contact.phone_numbers)
+                .where(~Contact.deleted)
+                .where(all_conditions)
+            )
+        else:
+            stmt = (
+                select(func.count(func.distinct(Contact.id)))
+                .select_from(Contact)
+                .where(~Contact.deleted)
+                .where(all_conditions)
+            )
 
         count = self.db.execute(stmt).scalar()
         return count or 0
@@ -242,12 +248,18 @@ class SearchService:
         Returns:
             List of SQLAlchemy conditions
         """
+        # Escape LIKE wildcards to treat them as literals
+        escaped_term = (
+            search_term.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
         # Case-insensitive pattern matching
-        pattern = f"%{search_term}%"
+        pattern = f"%{escaped_term}%"
         return [
-            Contact.display_name.ilike(pattern),
-            Contact.given_name.ilike(pattern),
-            Contact.family_name.ilike(pattern),
+            Contact.display_name.ilike(pattern, escape="\\"),
+            Contact.given_name.ilike(pattern, escape="\\"),
+            Contact.family_name.ilike(pattern, escape="\\"),
         ]
 
     def _build_phone_search_conditions(self, search_term: str) -> List:
