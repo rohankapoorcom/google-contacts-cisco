@@ -9,7 +9,7 @@
  * - Pagination
  * - Responsive design
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { api } from '@/api/client'
 import type { Contact, SearchResult } from '@/types/api'
 import ContactCard from '@/components/ContactCard.vue'
