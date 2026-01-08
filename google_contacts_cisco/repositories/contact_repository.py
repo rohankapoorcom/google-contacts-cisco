@@ -338,8 +338,12 @@ class ContactRepository:
 
         if letter == "#":
             # Match contacts starting with non-alphabetic characters
+            # Cross-database compatible: check first character is not alphabetic
+            from sqlalchemy import func
+            first_char = func.substr(Contact.display_name, 1, 1)
             query = query.filter(
-                ~Contact.display_name.op('~')('^[A-Za-z]')
+                ~first_char.between('A', 'Z'),
+                ~first_char.between('a', 'z')
             )
         else:
             # Match contacts starting with specific letter (case-insensitive)

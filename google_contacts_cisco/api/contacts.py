@@ -164,6 +164,35 @@ async def get_contacts(
         )
 
 
+@router.get("/contacts/stats", response_model=ContactStatsResponse)
+async def get_contact_stats(
+    db: Session = Depends(get_db),
+) -> ContactStatsResponse:
+    """Get contact statistics.
+
+    Returns aggregate statistics about contacts in the database,
+    including counts of contacts with phone numbers, emails, etc.
+
+    Args:
+        db: Database session
+
+    Returns:
+        ContactStatsResponse with statistics
+    """
+    repo = ContactRepository(db)
+
+    try:
+        stats = repo.get_contact_statistics()
+        return ContactStatsResponse(**stats)
+
+    except Exception as e:
+        logger.exception("Error fetching contact statistics")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch statistics: {str(e)}"
+        )
+
+
 @router.get("/contacts/{contact_id}", response_model=ContactResponse)
 async def get_contact_by_id(
     contact_id: UUID,
@@ -202,35 +231,6 @@ async def get_contact_by_id(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch contact: {str(e)}"
-        )
-
-
-@router.get("/contacts/stats", response_model=ContactStatsResponse)
-async def get_contact_stats(
-    db: Session = Depends(get_db),
-) -> ContactStatsResponse:
-    """Get contact statistics.
-
-    Returns aggregate statistics about contacts in the database,
-    including counts of contacts with phone numbers, emails, etc.
-
-    Args:
-        db: Database session
-
-    Returns:
-        ContactStatsResponse with statistics
-    """
-    repo = ContactRepository(db)
-
-    try:
-        stats = repo.get_contact_statistics()
-        return ContactStatsResponse(**stats)
-
-    except Exception as e:
-        logger.exception("Error fetching contact statistics")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch statistics: {str(e)}"
         )
 
 
@@ -291,11 +291,11 @@ async def search_contacts(
                 given_name=result.contact.given_name,
                 family_name=result.contact.family_name,
                 phone_numbers=[
-                    PhoneNumberResponse.from_orm(p) for p in result.contact.phone_numbers
+                    PhoneNumberResponse.model_validate(p) for p in result.contact.phone_numbers
                 ],
                 email_addresses=[
-                    EmailAddressResponse.from_orm(e) for e in result.contact.email_addresses
-                ],
+                    EmailAddressResponse.model_validate(e) for e in result.contact.email_addresses
+                ] if hasattr(result.contact, 'email_addresses') else [],
                 match_type=result.match_type,
                 match_field=result.match_field,
             ))

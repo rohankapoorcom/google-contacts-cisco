@@ -25,11 +25,16 @@ const emit = defineEmits<{
 // =====================
 
 const initials = computed(() => {
+  if (!props.contact.display_name) {
+    return '?'
+  }
   const parts = props.contact.display_name.split(' ')
   if (parts.length === 1) {
     return parts[0].substring(0, 2).toUpperCase()
   }
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  const first = parts[0]?.[0] || ''
+  const last = parts[parts.length - 1]?.[0] || ''
+  return (first + last).toUpperCase() || '?'
 })
 
 const avatarColor = computed(() => {

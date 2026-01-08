@@ -103,7 +103,7 @@ class PhoneNumberResponse(BaseModel):
     id: UUID
     value: str
     display_value: str
-    type: str
+    type: Optional[str] = None
     primary: bool
 
     model_config = {"from_attributes": True}
@@ -114,7 +114,7 @@ class EmailAddressResponse(BaseModel):
 
     id: UUID
     value: str
-    type: str
+    type: Optional[str] = None
     primary: bool
 
     model_config = {"from_attributes": True}

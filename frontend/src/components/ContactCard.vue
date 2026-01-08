@@ -26,8 +26,9 @@ const props = withDefaults(defineProps<Props>(), {
 // =====================
 
 const primaryPhone = computed(() => {
-  const primary = props.contact.phone_numbers.find(p => p.primary)
-  return primary || props.contact.phone_numbers[0]
+  const phones = props.contact.phone_numbers || []
+  const primary = phones.find(p => p.primary)
+  return primary || phones[0]
 })
 
 const primaryEmail = computed(() => {
@@ -36,11 +37,16 @@ const primaryEmail = computed(() => {
 })
 
 const initials = computed(() => {
+  if (!props.contact.display_name) {
+    return '?'
+  }
   const parts = props.contact.display_name.split(' ')
   if (parts.length === 1) {
     return parts[0].substring(0, 2).toUpperCase()
   }
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  const first = parts[0]?.[0] || ''
+  const last = parts[parts.length - 1]?.[0] || ''
+  return (first + last).toUpperCase() || '?'
 })
 
 const avatarColor = computed(() => {
@@ -71,11 +77,22 @@ function highlightMatch(text: string): string {
   const query = props.searchQuery.trim()
   if (!query) return text
   
+  // HTML-escape the text first to prevent XSS
+  const escapeHtml = (str: string) => str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+  
+  const safeText = escapeHtml(text)
+  const safeQuery = escapeHtml(query)
+  
   // Escape special regex characters
-  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedQuery = safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   
-  return text.replace(regex, '<mark class="bg-yellow-200 px-0.5 rounded">$1</mark>')
+  return safeText.replace(regex, '<mark class="bg-yellow-200 px-0.5 rounded">$1</mark>')
 }
 
 function formatPhoneType(type: string): string {
