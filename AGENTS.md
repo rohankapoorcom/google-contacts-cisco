@@ -59,33 +59,45 @@ bd sync               # Sync with git
    bd close <id>
    ```
 
-7. **Sync and Commit**:
+7. **Sync, Commit, and Push**:
    ```bash
    bd sync
    git add -A
    git commit -m "..."
+   git push -u origin <branch-name>
    ```
 
-### Common Mistake to Avoid
+8. **Create Pull Request** (MANDATORY):
+   - Use GitHub MCP tools to create PR
+   - Include summary, changes, test results
+   - Reference issue ID in PR body
 
-❌ **WRONG**:
+### Common Mistakes to Avoid
+
+❌ **WRONG** - Missing critical steps:
 ```bash
 # Start coding immediately after seeing "Execute the next available task"
 git checkout -b task/feature
 # Write code...
-bd close <id>  # Claim and close at the end
+bd close <id>              # Claim and close at the end
+git push                   # Push but forget PR - INCOMPLETE!
 ```
 
-✅ **CORRECT**:
+✅ **CORRECT** - Complete workflow:
 ```bash
-bd ready                    # Find work
-bd show <id>               # Review details
-bd update <id> --status in_progress  # CLAIM FIRST
-git checkout -b task/feature
-# Write code...
-bd close <id>              # Mark complete
-bd sync                    # Sync with git
+bd ready                    # 1. Find work
+bd show <id>               # 2. Review details
+bd update <id> --status in_progress  # 3. CLAIM FIRST (mandatory!)
+git checkout -b task/feature         # 4. Create branch
+# Write code and tests...             5. Implement
+bd close <id>              # 6. Mark complete
+bd sync                    # 7. Sync with git
+git add -A && git commit   # 8. Commit changes
+git push -u origin task/feature     # 9. Push to remote
+# Use GitHub MCP to create PR        10. CREATE PR (mandatory!)
 ```
+
+**⚠️ CRITICAL**: Steps 3 (claim) and 10 (create PR) are MANDATORY and often forgotten!
 
 ## Detailed Task Execution Workflow
 
@@ -102,7 +114,7 @@ This document provides:
 
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until a PR is created.
 
 **MANDATORY WORKFLOW:**
 
@@ -116,13 +128,21 @@ This document provides:
    git push
    git status  # MUST show "up to date with origin"
    ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+5. **CREATE PULL REQUEST** - This is MANDATORY:
+   - Use GitHub MCP tools to create PR
+   - Include comprehensive summary of changes
+   - List all acceptance criteria met
+   - Include test results
+   - Reference the issue ID in PR body
+   - NEVER skip this step - a pushed branch without a PR is incomplete work
+6. **Clean up** - Clear stashes, prune remote branches
+7. **Verify** - All changes committed, pushed, AND PR created
+8. **Hand off** - Provide PR URL and context for next session
 
 **CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
+- Work is NOT complete until PR is created
+- NEVER stop after just pushing - YOU must create the PR
+- NEVER say "ready to create PR when you are" - YOU must create it
+- If PR creation fails, resolve and retry until it succeeds
+- A pushed branch without a PR is INCOMPLETE
 
