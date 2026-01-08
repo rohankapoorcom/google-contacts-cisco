@@ -59,12 +59,20 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 addopts = [
+    "-v",
     "--strict-markers",
     "--strict-config",
-    "--verbose",
+    "--cov=google_contacts_cisco",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--cov-fail-under=80",
 ]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "e2e: End-to-end tests",
+    "slow: Slow running tests",
 ]
 
 [tool.mypy]
@@ -93,7 +101,9 @@ disallow_untyped_defs = false
 source = ["google_contacts_cisco"]
 omit = [
     "*/tests/*",
-    "*/test_*.py",
+    "*/conftest.py",
+    "*/__init__.py",
+    "*/main.py",
 ]
 
 [tool.coverage.report]
@@ -106,6 +116,8 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "@abstractmethod",
 ]
+precision = 2
+show_missing = true
 
 [tool.ruff]
 line-length = 88
