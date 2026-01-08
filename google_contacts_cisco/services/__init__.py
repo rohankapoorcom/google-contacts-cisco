@@ -2,7 +2,7 @@
 
 This package provides service classes that encapsulate business logic,
 including contact transformation, Google API client, synchronization,
-and Cisco XML formatting.
+contact search, and Cisco XML formatting.
 """
 
 from .contact_transformer import (
@@ -18,6 +18,7 @@ from .google_client import (
     SyncTokenExpiredError,
     get_google_client,
 )
+from .search_service import SearchService, get_search_service
 from .sync_service import SyncService, SyncStatistics, get_sync_service
 from .xml_formatter import (
     GROUP_MAPPINGS,
@@ -37,6 +38,9 @@ __all__ = [
     "ServerError",
     "SyncTokenExpiredError",
     "get_google_client",
+    # Search service
+    "SearchService",
+    "get_search_service",
     # Sync service
     "SyncService",
     "SyncStatistics",
