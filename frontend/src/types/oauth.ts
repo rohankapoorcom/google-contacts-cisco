@@ -1,27 +1,9 @@
 /**
  * OAuth-related TypeScript types
+ * 
+ * Note: Most types are re-exported from api.ts for consistency.
+ * This file is maintained for backward compatibility and additional OAuth-specific types.
  */
-
-export interface OAuthTokenInfo {
-  valid: boolean
-  expired: boolean
-  expiry: string | null
-  scopes: string[]
-}
-
-export interface OAuthStatus {
-  authenticated: boolean
-  token_info: OAuthTokenInfo | null
-}
-
-export interface OAuthStatusResponse {
-  authenticated: boolean
-  has_token_file: boolean
-  credentials_valid: boolean
-  credentials_expired: boolean
-  has_refresh_token: boolean
-  scopes: string[]
-}
 
 export interface ApiResponse<T = unknown> {
   message?: string
@@ -29,7 +11,5 @@ export interface ApiResponse<T = unknown> {
   data?: T
 }
 
-export interface ApiError {
-  detail: string
-  status?: number
-}
+// Re-export common types from api.ts to avoid duplication
+export type { OAuthStatus, ApiError } from './api'

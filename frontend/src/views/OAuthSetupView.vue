@@ -6,9 +6,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
-import type { OAuthStatus } from '@/types/api'
+import type { OAuthStatus, ApiError } from '@/types/api'
 import type { AxiosError } from 'axios'
-import type { ApiError } from '@/types/oauth'
 
 // Reactive state
 const oauthStatus = ref<OAuthStatus | null>(null)
@@ -106,30 +105,18 @@ async function disconnect() {
   }
 }
 
-/**
- * Handle OAuth callback query parameters
- */
-function handleOAuthCallback() {
+// Lifecycle hooks
+onMounted(async () => {
+  // Handle OAuth callback query parameters
   const code = route.query.code as string | undefined
   const errorParam = route.query.error as string | undefined
 
   if (errorParam) {
     error.value = `OAuth error: ${errorParam}`
-    return
   }
 
-  if (code) {
-    // Callback handled by backend at /auth/callback
-    // The backend will show success page, user returns here manually
-    // Just reload the status
-    loadOAuthStatus()
-  }
-}
-
-// Lifecycle hooks
-onMounted(() => {
-  handleOAuthCallback()
-  loadOAuthStatus()
+  // Load OAuth status (only once, whether callback or normal page load)
+  await loadOAuthStatus()
 })
 </script>
 
@@ -339,9 +326,15 @@ onMounted(() => {
       v-if="showDisconnectConfirm"
       class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
       @click.self="showDisconnectConfirm = false"
+      @keydown.escape="showDisconnectConfirm = false"
     >
-      <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-        <h3 class="text-xl font-semibold text-slate-800 mb-3">
+      <div
+        class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="disconnect-dialog-title"
+      >
+        <h3 id="disconnect-dialog-title" class="text-xl font-semibold text-slate-800 mb-3">
           Disconnect from Google?
         </h3>
         <p class="text-slate-600 mb-6">

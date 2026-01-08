@@ -17,6 +17,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from google.auth.transport.requests import Request as GoogleAuthRequest
 from pydantic import BaseModel
 
 from ..auth.oauth import (
@@ -102,17 +103,16 @@ async def auth_url(
         logger.info("Generated OAuth URL for client-side redirect")
         return AuthUrlResponse(auth_url=auth_url, state=generated_state)
     except CredentialsNotConfiguredError as e:
-        logger.error("OAuth credentials not configured: %s", e)
+        logger.exception("OAuth credentials not configured")
         raise HTTPException(
             status_code=500,
             detail="Google OAuth credentials not configured. "
             "Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
-        )
+        ) from e
 
 
 @router.get("/google", response_class=RedirectResponse)
 async def auth_google(
-    request: Request,
     redirect_uri: Optional[str] = Query(
         None, description="Optional custom redirect URI after auth"
     ),
@@ -122,7 +122,6 @@ async def auth_google(
     Redirects the user to Google's consent screen to authorize the application.
 
     Args:
-        request: FastAPI request object
         redirect_uri: Optional URI to redirect to after successful auth
 
     Returns:
@@ -273,9 +272,7 @@ async def auth_refresh() -> RefreshResponse:
             )
 
         # Force refresh even if not expired
-        from google.auth.transport.requests import Request
-
-        creds.refresh(Request())
+        creds.refresh(GoogleAuthRequest())
         save_credentials(creds)
 
         logger.info("Access token refreshed successfully")
@@ -287,17 +284,17 @@ async def auth_refresh() -> RefreshResponse:
         # Re-raise HTTP exceptions to preserve status codes
         raise
     except TokenRefreshError as e:
-        logger.error("Token refresh failed: %s", e)
+        logger.exception("Token refresh failed")
         raise HTTPException(
             status_code=401,
             detail=f"Token refresh failed: {e}",
-        )
+        ) from e
     except Exception as e:
         logger.exception("Unexpected error during token refresh")
         raise HTTPException(
             status_code=500,
             detail=f"Token refresh failed: {e}",
-        )
+        ) from e
 
 
 @router.post("/revoke", response_model=RevokeResponse)
