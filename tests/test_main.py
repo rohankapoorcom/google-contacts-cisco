@@ -1,8 +1,10 @@
 """Test main application."""
 
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
-from google_contacts_cisco.main import app
+from google_contacts_cisco.main import app, STATIC_DIR
 from google_contacts_cisco._version import __version__
 from google_contacts_cisco.config import settings
 
@@ -11,14 +13,25 @@ client = TestClient(app)
 
 
 def test_root():
-    """Test root endpoint returns app name and version."""
+    """Test root endpoint.
+
+    When frontend is built, returns HTML.
+    When frontend is not built, returns JSON with app info.
+    """
     response = client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert "message" in data
-    assert settings.app_name in data["message"]
-    assert "version" in data
-    assert data["version"] == __version__
+
+    # Check if frontend is built
+    if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
+        # Frontend is built - serves HTML
+        assert "text/html" in response.headers.get("content-type", "")
+    else:
+        # Frontend not built - returns JSON API info
+        data = response.json()
+        assert "message" in data
+        assert settings.app_name in data["message"]
+        assert "version" in data
+        assert data["version"] == __version__
 
 
 def test_health():
