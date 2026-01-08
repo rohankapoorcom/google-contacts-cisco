@@ -160,7 +160,7 @@ class TestSearchContacts:
     @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_contacts_without_phone_search(
-        self, mock_get_service, mock_get_db, client, sample_contacts
+        self, mock_get_service, mock_get_db, client
     ):
         """Should support disabling phone search."""
         # Setup mocks
