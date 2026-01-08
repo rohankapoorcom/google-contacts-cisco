@@ -51,7 +51,7 @@ class SyncScheduler:
             result = sync_service.safe_auto_sync()
             logger.info("Scheduled sync completed: %s", result)
         except Exception as e:
-            logger.error("Scheduled sync failed: %s", e)
+            logger.exception("Scheduled sync failed: %s", e)
         finally:
             db.close()
 

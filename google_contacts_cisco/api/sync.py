@@ -410,19 +410,19 @@ async def trigger_safe_sync(
         )
 
     except CredentialsError as e:
-        logger.error("Credentials error during safe sync: %s", e)
+        logger.exception("Credentials error during safe sync")
         raise HTTPException(
             status_code=401,
             detail=str(e),
-        )
+        ) from e
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Safe sync failed with unexpected error")
         raise HTTPException(
             status_code=500,
-            detail=f"Sync failed: {str(e)}",
-        )
+            detail=f"Sync failed: {e!s}",
+        ) from e
 
 
 @router.get("/history", response_model=SyncHistoryResponse)
@@ -486,12 +486,26 @@ async def clear_sync_history(
     Removes old sync state records from the database.
     Optionally keeps the most recent sync state.
 
+    Prerequisites:
+    - User must be authenticated with Google OAuth
+
     Args:
         keep_latest: If True, keep the most recent sync state (default True)
 
     Returns:
         ClearHistoryResponse with number of deleted records
+
+    Raises:
+        HTTPException 401: If not authenticated with Google
     """
+    # Check authentication
+    if not is_authenticated():
+        logger.warning("Clear sync history requested but user is not authenticated")
+        raise HTTPException(
+            status_code=401,
+            detail="Not authenticated with Google. Please complete OAuth setup first.",
+        )
+
     sync_service = get_sync_service(db)
     deleted_count = sync_service.clear_sync_history(keep_latest)
     return ClearHistoryResponse(

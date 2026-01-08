@@ -767,9 +767,26 @@ class TestSyncStatisticsEndpoint:
 class TestClearHistoryEndpoint:
     """Test DELETE /api/sync/history endpoint."""
 
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_clear_history_keep_latest(self, mock_get_service, client):
+    def test_clear_history_not_authenticated(
+        self, mock_get_service, mock_is_authenticated, client
+    ):
+        """Test clearing history when not authenticated."""
+        mock_is_authenticated.return_value = False
+
+        response = client.delete("/api/sync/history?keep_latest=true")
+
+        assert response.status_code == 401
+        mock_get_service.assert_not_called()
+
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
+    @patch("google_contacts_cisco.api.sync.get_sync_service")
+    def test_clear_history_keep_latest(
+        self, mock_get_service, mock_is_authenticated, client
+    ):
         """Test clearing history while keeping latest."""
+        mock_is_authenticated.return_value = True
         mock_service = Mock()
         mock_service.clear_sync_history.return_value = 5
         mock_get_service.return_value = mock_service
@@ -782,9 +799,13 @@ class TestClearHistoryEndpoint:
         assert data["deleted_count"] == 5
         mock_service.clear_sync_history.assert_called_with(True)
 
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_clear_history_delete_all(self, mock_get_service, client):
+    def test_clear_history_delete_all(
+        self, mock_get_service, mock_is_authenticated, client
+    ):
         """Test clearing all history."""
+        mock_is_authenticated.return_value = True
         mock_service = Mock()
         mock_service.clear_sync_history.return_value = 10
         mock_get_service.return_value = mock_service
@@ -796,9 +817,13 @@ class TestClearHistoryEndpoint:
         assert data["deleted_count"] == 10
         mock_service.clear_sync_history.assert_called_with(False)
 
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_clear_history_default_keeps_latest(self, mock_get_service, client):
+    def test_clear_history_default_keeps_latest(
+        self, mock_get_service, mock_is_authenticated, client
+    ):
         """Test default behavior keeps latest."""
+        mock_is_authenticated.return_value = True
         mock_service = Mock()
         mock_service.clear_sync_history.return_value = 3
         mock_get_service.return_value = mock_service
@@ -808,9 +833,13 @@ class TestClearHistoryEndpoint:
         assert response.status_code == 200
         mock_service.clear_sync_history.assert_called_with(True)
 
+    @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_clear_history_empty(self, mock_get_service, client):
+    def test_clear_history_empty(
+        self, mock_get_service, mock_is_authenticated, client
+    ):
         """Test clearing empty history."""
+        mock_is_authenticated.return_value = True
         mock_service = Mock()
         mock_service.clear_sync_history.return_value = 0
         mock_get_service.return_value = mock_service

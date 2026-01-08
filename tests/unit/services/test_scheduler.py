@@ -258,3 +258,4 @@ class TestSchedulerIntegration:
         # Note: The scheduler waits before first run, so we may not see calls
         # in a short test. This is testing the mechanism, not timing.
 
+
