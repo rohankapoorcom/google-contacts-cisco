@@ -1,0 +1,491 @@
+{
+  "info": {
+    "name": "Google Contacts to Cisco IP Phone API",
+    "description": "Complete API collection for testing Google Contacts to Cisco IP Phone application. Includes authentication, contacts, search, sync, and Cisco directory endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "0.1.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "contact_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Get Health Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check application health and configuration status"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Get OAuth URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/url",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "url"]
+            },
+            "description": "Get Google OAuth authorization URL for client-side redirect"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Auth Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/status",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "status"]
+            },
+            "description": "Check current authentication status and credential validity"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "refresh"]
+            },
+            "description": "Manually refresh the OAuth access token"
+          },
+          "response": []
+        },
+        {
+          "name": "Revoke Credentials",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/revoke",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "revoke"]
+            },
+            "description": "Revoke OAuth credentials and delete local token file"
+          },
+          "response": []
+        }
+      ],
+      "description": "OAuth 2.0 authentication endpoints for Google account integration"
+    },
+    {
+      "name": "Contacts",
+      "item": [
+        {
+          "name": "List Contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/contacts?limit=20&offset=0&sort=name",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of contacts per page (1-100)"
+                },
+                {
+                  "key": "offset",
+                  "value": "0",
+                  "description": "Offset for pagination"
+                },
+                {
+                  "key": "sort",
+                  "value": "name",
+                  "description": "Sort order: name or recent"
+                },
+                {
+                  "key": "group",
+                  "value": "",
+                  "description": "Filter by first letter (A-Z or #)",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Get paginated list of contacts with optional filtering and sorting"
+          },
+          "response": []
+        },
+        {
+          "name": "List Contacts (Filtered by Group)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/contacts?limit=20&group=A",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "group",
+                  "value": "A",
+                  "description": "Show only contacts starting with 'A'"
+                }
+              ]
+            },
+            "description": "Get contacts filtered by first letter (A-Z or # for numbers)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Contact",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/contacts/{{contact_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts", "{{contact_id}}"]
+            },
+            "description": "Get detailed information for a single contact by UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contact Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/contacts/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "contacts", "stats"]
+            },
+            "description": "Get aggregate statistics about contacts in the database"
+          },
+          "response": []
+        }
+      ],
+      "description": "Contact management and listing endpoints"
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Search Contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/search?q=john&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "john",
+                  "description": "Search query (minimum 2 characters)"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Maximum results to return (1-100)"
+                }
+              ]
+            },
+            "description": "Search contacts by name or phone number with multiple matching strategies"
+          },
+          "response": []
+        },
+        {
+          "name": "Search by Phone Number",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/search?q=234567&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "234567",
+                  "description": "Phone number digits"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Search contacts by phone number (partial matching supported)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Full-text search endpoints for contacts"
+    },
+    {
+      "name": "Synchronization",
+      "item": [
+        {
+          "name": "Get Sync Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "status"]
+            },
+            "description": "Get current synchronization status and metadata"
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Auto Sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync"]
+            },
+            "description": "Automatically choose between full and incremental sync (recommended)"
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Full Sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/full",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "full"]
+            },
+            "description": "Force complete synchronization of all contacts from Google"
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Incremental Sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/incremental",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "incremental"]
+            },
+            "description": "Sync only contacts changed since last sync (requires sync token)"
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Safe Sync",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/safe",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "safe"]
+            },
+            "description": "Sync with concurrency protection (recommended for scheduled tasks)"
+          },
+          "response": []
+        },
+        {
+          "name": "Check if Full Sync Needed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/needs-sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "needs-sync"]
+            },
+            "description": "Determine if a full sync is required"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sync History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/history?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Number of records to return (1-100)"
+                }
+              ]
+            },
+            "description": "Get list of recent sync operations with outcomes"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Sync Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "statistics"]
+            },
+            "description": "Get comprehensive synchronization statistics"
+          },
+          "response": []
+        },
+        {
+          "name": "Clear Sync History",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/sync/history?keep_latest=true",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sync", "history"],
+              "query": [
+                {
+                  "key": "keep_latest",
+                  "value": "true",
+                  "description": "Keep the most recent sync state"
+                }
+              ]
+            },
+            "description": "Remove old sync state records from database"
+          },
+          "response": []
+        }
+      ],
+      "description": "Synchronization endpoints for managing Google Contacts sync"
+    },
+    {
+      "name": "Cisco Directory",
+      "item": [
+        {
+          "name": "Get Main Directory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/directory",
+              "host": ["{{base_url}}"],
+              "path": ["directory"]
+            },
+            "description": "Get main directory menu with phone keypad groups (XML format)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Group Directory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/directory/groups/2ABC",
+              "host": ["{{base_url}}"],
+              "path": ["directory", "groups", "2ABC"]
+            },
+            "description": "Get contacts in specific phone keypad group (XML format)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Contact Directory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/directory/contacts/{{contact_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["directory", "contacts", "{{contact_id}}"]
+            },
+            "description": "Get dialable directory for individual contact (XML format)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Directory Help",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/directory/help?context=main",
+              "host": ["{{base_url}}"],
+              "path": ["directory", "help"],
+              "query": [
+                {
+                  "key": "context",
+                  "value": "main",
+                  "description": "Help context (main, group, contact)"
+                }
+              ]
+            },
+            "description": "Get context-specific help text (XML format)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Cisco IP Phone XML directory endpoints"
+    },
+    {
+      "name": "Google API",
+      "item": [
+        {
+          "name": "Test Google Connection",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/test-connection",
+              "host": ["{{base_url}}"],
+              "path": ["api", "test-connection"]
+            },
+            "description": "Verify connection to Google People API with stored credentials"
+          },
+          "response": []
+        }
+      ],
+      "description": "Google API testing endpoints"
+    }
+  ]
+}
