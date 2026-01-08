@@ -12,6 +12,19 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
+## Detailed Task Execution Workflow
+
+For comprehensive guidance on executing tasks, including implementation, testing, code review, and PR creation, see:
+
+**[.ai/prompts/task-execution.md](.ai/prompts/task-execution.md)**
+
+This document provides:
+- Complete 10-step workflow from task selection to PR creation
+- Code quality standards and testing philosophy
+- Commit message guidelines and PR templates
+- Common pitfalls and troubleshooting
+- Integration with beads issue tracking
+
 ## Landing the Plane (Session Completion)
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.

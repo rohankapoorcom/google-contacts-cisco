@@ -14,14 +14,68 @@ This project has been fully planned with 25 detailed implementation tasks organi
 
 ## Execution Workflow
 
-When assigned a task, follow this systematic workflow:
+When starting work, follow this systematic 10-step workflow:
+
+### 0. Task Selection Phase
+
+**Objective**: Find and claim an available task from beads
+
+#### Find Available Work
+
+```bash
+# List all tasks ready to be worked on
+bd ready
+```
+
+This shows tasks that:
+- Have all dependencies completed
+- Are not currently assigned or in progress
+- Are ready for implementation
+
+#### Review Task Details
+
+```bash
+# View detailed information about a specific task
+bd show <id>
+
+# Example:
+bd show 5
+```
+
+This displays:
+- Task title and description
+- Current status and priority
+- Dependencies and blockers
+- Acceptance criteria
+- Implementation notes
+- Related files and documentation
+
+#### Claim the Task
+
+Once you've selected a task to work on:
+
+```bash
+# Mark the task as in progress and assign it to yourself
+bd update <id> --status in_progress
+
+# Example:
+bd update 5 --status in_progress
+```
+
+**Task Selection Tips**:
+- Start with tasks that have no pending dependencies
+- Check priority levels - focus on high-priority items first
+- Review time estimates to match your available working time
+- Verify you have the necessary context and skills for the task
+- Ensure the task description is clear before starting
 
 ### 1. Review Phase
 
 **Objective**: Understand the task requirements and context
 
-- [ ] Read the assigned task file thoroughly from start to finish
-- [ ] Review the task's dependencies listed in the task index
+- [ ] Read the task details from `bd show <id>` thoroughly
+- [ ] If task references planning documents, read the assigned task file from `.ai/planning/tasks/`
+- [ ] Review the task's dependencies listed in beads and the task index
 - [ ] Verify that all prerequisite tasks are completed
 - [ ] Check the acceptance criteria checklist
 - [ ] Review any related documentation linked in the task file
@@ -165,9 +219,27 @@ pytest --cov=google_contacts_cisco --cov-report=html
 
 ### 6. Task Status Update
 
-**Objective**: Mark the task as complete in the documentation
+**Objective**: Mark the task as complete in beads and documentation
 
-Update the task file to indicate completion:
+#### Close the Task in Beads
+
+```bash
+# Mark the task as complete in beads
+bd close <id>
+
+# Example:
+bd close 5
+```
+
+This command:
+- Updates the task status to completed
+- Records completion timestamp
+- Unblocks any dependent tasks
+- Updates project progress tracking
+
+#### Update Task Documentation (if applicable)
+
+If the task has a corresponding file in `.ai/planning/tasks/`, update it to indicate completion:
 
 - [ ] Add a completion marker at the top of the task file
 - [ ] Document any deviations from the planned approach
@@ -262,7 +334,12 @@ Detailed notes here..."
 
 # Verify commit
 git log -1 --stat
+
+# Sync beads with git commits
+bd sync
 ```
+
+**Note**: The `bd sync` command keeps beads issue tracking synchronized with your git commit history, ensuring task progress is accurately reflected.
 
 ### 8. Pull Request Phase
 
@@ -442,14 +519,16 @@ Before creating the PR:
 
 Before considering the task complete:
 
+- [ ] Task claimed in beads with `bd update <id> --status in_progress`
 - [ ] Branch created and checked out
-- [ ] Task file reviewed and understood
+- [ ] Task details reviewed and understood (via `bd show <id>`)
 - [ ] All implementation steps completed
 - [ ] Unit tests written and passing (>80% coverage)
 - [ ] Code self-reviewed for quality and accuracy
 - [ ] All acceptance criteria verified
 - [ ] Linters and type checkers passing
-- [ ] Task file updated with completion status
+- [ ] Task closed in beads with `bd close <id>`
+- [ ] Task file updated with completion status (if applicable)
 - [ ] Changes committed with descriptive message
 - [ ] Branch pushed to remote repository
 - [ ] Pull request created (if applicable)
@@ -592,11 +671,13 @@ After completing a task:
 
 When you're ready to execute a task:
 
-1. Specify which task you're working on (e.g., "Task 02: Database Setup")
-2. Follow the 9-step execution workflow above
-3. Use the task file as your primary implementation guide
-4. Maintain high code quality and test coverage standards
-5. Mark the task complete when all criteria are satisfied
+1. Run `bd ready` to find available tasks
+2. Use `bd show <id>` to review task details
+3. Claim the task with `bd update <id> --status in_progress`
+4. Follow the 10-step execution workflow above (starting from step 0)
+5. Use the task details and any referenced planning documents as your implementation guide
+6. Maintain high code quality and test coverage standards
+7. Close the task with `bd close <id>` when all criteria are satisfied
 
 **Let's build something great! 🚀**
 
