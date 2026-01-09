@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from ._version import __version__
 from .api.contacts import router as contacts_router
@@ -141,6 +142,18 @@ For issues and questions, check the troubleshooting guide or review application 
         },
     ],
 )
+
+# Proxy headers middleware (for reverse proxy deployments)
+# This must be added before other middleware to properly handle X-Forwarded-* headers
+if settings.trusted_proxies:
+    app.add_middleware(
+        ProxyHeadersMiddleware,
+        trusted_hosts=settings.trusted_proxies,
+    )
+    logger.info(
+        "Proxy headers middleware enabled - trusting X-Forwarded-* headers from: %s",
+        ", ".join(settings.trusted_proxies),
+    )
 
 # CORS middleware (for development)
 app.add_middleware(

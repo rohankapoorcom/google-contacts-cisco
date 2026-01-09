@@ -204,7 +204,13 @@ LOG_LEVEL=INFO
 # Sync Scheduler (Optional)
 SYNC_SCHEDULER_ENABLED=true
 SYNC_INTERVAL_MINUTES=30
+
+# Reverse Proxy (Required if behind nginx, Traefik, etc.)
+# JSON array of trusted proxy IPs/CIDR ranges
+TRUSTED_PROXIES=["127.0.0.1", "172.17.0.0/16"]
 ```
+
+**Important**: If deploying behind a reverse proxy with HTTPS termination (nginx, Traefik, Apache, etc.), you **must** set `TRUSTED_PROXIES` to your proxy's IP address for OAuth to work correctly. See [Reverse Proxy Setup Guide](docs/reverse-proxy-setup.md) for details.
 
 See [Configuration Guide](docs/configuration.md) for all available options.
 
@@ -272,6 +278,7 @@ pytest -v
 
 Common issues and solutions:
 
+- **OAuth "insecure_transport" error**: If behind a reverse proxy, set `BEHIND_PROXY=true` in `.env`. See [Reverse Proxy Setup Guide](docs/reverse-proxy-setup.md)
 - **OAuth not working**: Check credentials in `.env` and redirect URI in Google Console
 - **Sync fails**: Verify authentication with `GET /auth/status`
 - **No contacts**: Trigger sync with `POST /api/sync`

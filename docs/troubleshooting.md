@@ -156,6 +156,75 @@ sudo systemctl restart google-contacts-cisco
    GOOGLE_REDIRECT_URI=https://yourdomain.com/auth/callback
    ```
 
+### OAuth insecure_transport Error (Behind Reverse Proxy)
+
+**Error**: `(insecure_transport) OAuth 2 MUST utilize https` or `Token exchange failed: (insecure_transport)`
+
+**Cause**: Application is behind a reverse proxy that terminates SSL/TLS, causing the backend to receive HTTP requests even though clients connect via HTTPS. The OAuth library rejects HTTP URLs.
+
+**Solution**:
+
+```bash
+# 1. Determine your reverse proxy's IP address
+# If using Docker:
+docker network inspect <network_name> | grep Gateway
+# If local nginx:
+# Proxy IP is usually 127.0.0.1
+
+# 2. Set TRUSTED_PROXIES in .env with your proxy IP (JSON array format)
+echo 'TRUSTED_PROXIES=["127.0.0.1", "172.17.0.0/16"]' >> .env
+
+# 3. Restart application
+sudo systemctl restart google-contacts-cisco
+
+# 4. Verify proxy headers are being forwarded
+# Check nginx/traefik/apache sends:
+# - X-Forwarded-Proto: https
+# - X-Forwarded-Host: your-domain.com
+# - X-Forwarded-For: client-ip
+
+# 5. Check logs for confirmation
+sudo journalctl -u google-contacts-cisco | grep "Proxy headers middleware enabled"
+# Should show: "trusting X-Forwarded-* headers from: 127.0.0.1, 172.17.0.0/16"
+```
+
+**Nginx Configuration**:
+```nginx
+location / {
+    proxy_pass http://backend:8000;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+}
+```
+
+**Important**:
+- **Only add your reverse proxy's IP address to `TRUSTED_PROXIES`**
+- Never trust the entire internet (`0.0.0.0/0`) in production
+- Ensure reverse proxy forwards `X-Forwarded-Proto` and `X-Forwarded-Host` headers
+- Use HTTPS redirect URI in Google Console: `https://yourdomain.com/auth/callback`
+- Use specific IP addresses or narrow CIDR ranges (e.g., `172.17.0.0/16` for Docker)
+
+See [Reverse Proxy Setup Guide](reverse-proxy-setup.md) for comprehensive configuration instructions.
+
+**Common trusted proxy configurations:**
+- **Nginx on same host**: `TRUSTED_PROXIES='["127.0.0.1"]'`
+- **Docker Compose**: `TRUSTED_PROXIES='["172.17.0.0/16"]'`
+- **Kubernetes**: Check your pod network CIDR, e.g., `TRUSTED_PROXIES='["10.244.0.0/16"]'`
+- **Multiple proxies**: `TRUSTED_PROXIES='["127.0.0.1", "10.0.1.5", "172.16.0.0/12"]'`
+
+**Alternative (Not Recommended)**:
+
+If you cannot determine proxy IPs, you can force the OAuth library to allow HTTP:
+
+```env
+OAUTHLIB_INSECURE_TRANSPORT=1
+```
+
+**⚠️ WARNING**: This approach is less secure as it bypasses transport security checks. Use the `TRUSTED_PROXIES` solution instead.
+
 ### Token Refresh Failed: invalid_grant
 
 **Error**: `Token refresh failed: invalid_grant`

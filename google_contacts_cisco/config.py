@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     # Search Settings
     search_results_limit: int = 50  # Max search results to return
 
+    # Proxy Settings (for reverse proxy deployments)
+    # List of trusted proxy IP addresses/CIDR ranges that can send X-Forwarded-* headers
+    # Example: ["127.0.0.1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    # Leave empty to disable proxy header trust
+    trusted_proxies: list[str] = Field(default_factory=list)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -121,6 +127,15 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Sync interval must be between 5 and 1440 minutes (24 hours)"
             )
+        return v
+
+    @field_validator("trusted_proxies", mode="before")
+    @classmethod
+    def parse_trusted_proxies(cls, v):
+        """Parse trusted_proxies from comma-separated string or list."""
+        if isinstance(v, str):
+            # Split comma-separated string and strip whitespace
+            return [ip.strip() for ip in v.split(",") if ip.strip()]
         return v
 
     @property
