@@ -239,8 +239,8 @@ Pre-built Docker images are automatically published via GitHub Actions and avail
 ### Pull and Run
 
 ```bash
-# Pull latest image
-docker pull ghcr.io/OWNER/REPO:latest
+# Pull latest image (main branch)
+docker pull ghcr.io/rohankapoorcom/google-contacts-cisco:main
 
 # Run container
 docker run -d \
@@ -249,7 +249,7 @@ docker run -d \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/.env:/app/.env:ro \
   --restart unless-stopped \
-  ghcr.io/OWNER/REPO:latest
+  ghcr.io/rohankapoorcom/google-contacts-cisco:main
 ```
 
 ### Available Tags

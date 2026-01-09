@@ -86,7 +86,7 @@ htmlcov/
 # Database
 *.sqlite
 *.sqlite3
-alembic/versions/*.py
+# Note: alembic/versions/*.py are needed for runtime migrations, do NOT exclude them
 
 # Temporary files
 *.tmp
