@@ -32,8 +32,6 @@ class TestSyncServiceIntegration:
     ):
         """Test complete full sync flow from Google API to database."""
         from google_contacts_cisco.services.sync_service import SyncService
-        from google_contacts_cisco.repositories.sync_repository import SyncRepository
-        from google_contacts_cisco.repositories.contact_repository import ContactRepository
         
         # Set up mocks
         mock_client = Mock()
@@ -61,15 +59,12 @@ class TestSyncServiceIntegration:
         ]
         mock_google_client_class.return_value = mock_client
         
-        # Create service instances
-        sync_repo = SyncRepository(integration_db)
-        contact_repo = ContactRepository(integration_db)
-        
+        # Create service instance (it creates repositories internally)
         with patch("google_contacts_cisco.auth.oauth.get_credentials", return_value=mock_credentials):
-            sync_service = SyncService(integration_db, sync_repo, contact_repo)
+            sync_service = SyncService(integration_db, google_client=mock_client)
             
             # Perform sync
-            sync_service.perform_full_sync()
+            sync_service.full_sync()
         
         # Verify results in database
         integration_db.expire_all()
@@ -89,8 +84,6 @@ class TestSyncServiceIntegration:
     ):
         """Test incremental sync updates existing contacts."""
         from google_contacts_cisco.services.sync_service import SyncService
-        from google_contacts_cisco.repositories.sync_repository import SyncRepository
-        from google_contacts_cisco.repositories.contact_repository import ContactRepository
         
         # Get existing contact
         existing_contact = integration_test_contacts[0]
@@ -117,13 +110,10 @@ class TestSyncServiceIntegration:
         )
         mock_google_client_class.return_value = mock_client
         
-        # Perform incremental sync
-        sync_repo = SyncRepository(integration_db)
-        contact_repo = ContactRepository(integration_db)
-        
+        # Perform incremental sync (service creates repositories internally)
         with patch("google_contacts_cisco.auth.oauth.get_credentials", return_value=mock_credentials):
-            sync_service = SyncService(integration_db, sync_repo, contact_repo)
-            sync_service.perform_incremental_sync()
+            sync_service = SyncService(integration_db, google_client=mock_client)
+            sync_service.incremental_sync()
         
         # Verify contact was updated
         integration_db.expire_all()

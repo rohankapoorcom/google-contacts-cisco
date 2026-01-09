@@ -157,9 +157,9 @@ class TestOAuthTokenManagement:
         
         assert response.status_code == status.HTTP_200_OK
     
-    @patch("google_contacts_cisco.auth.oauth.Credentials")
+    @patch("google_contacts_cisco.auth.oauth.get_credentials")
     def test_refresh_expired_credentials(
-        self, mock_credentials_class, integration_client
+        self, mock_get_credentials, integration_client
     ):
         """Test refreshing expired credentials."""
         mock_creds = Mock()
@@ -167,15 +167,22 @@ class TestOAuthTokenManagement:
         mock_creds.expired = True
         mock_creds.refresh_token = "refresh_token_123"
         
-        # Mock refresh
+        # Mock refresh to update credential state
         def refresh_side_effect(request):
             mock_creds.valid = True
             mock_creds.expired = False
         
         mock_creds.refresh.side_effect = refresh_side_effect
+        mock_get_credentials.return_value = mock_creds
         
-        # Credentials should be refreshed when needed
-        assert mock_creds.refresh_token is not None
+        # Call auth status endpoint which should check/refresh credentials
+        response = integration_client.get("/auth/status")
+        
+        # Verify response (may vary based on implementation)
+        assert response.status_code == status.HTTP_200_OK
+        
+        # Verify credentials were checked
+        assert mock_get_credentials.called
     
     @patch("google_contacts_cisco.auth.oauth.get_token_path")
     @patch("builtins.open", new_callable=mock_open)

@@ -12,14 +12,14 @@ See test_database_transactions.py for working integration tests.
 """
 
 import pytest
-
-# Skip all API integration tests pending TestClient dependency injection fixes
-pytestmark = pytest.mark.skip(reason="TestClient dependency injection needs fixing")
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
 from fastapi import status
 
 from google_contacts_cisco.models.sync_state import SyncStatus
+
+# Skip all API integration tests pending TestClient dependency injection fixes
+pytestmark = pytest.mark.skip(reason="TestClient dependency injection needs fixing")
 
 
 @pytest.mark.integration

@@ -149,14 +149,16 @@ class TestDatabaseTransactionIntegration:
         )
         integration_db.add(phone)
         
-        # Should fail on commit (depending on DB configuration)
+        # Should fail on commit if FK constraints are enforced
         try:
             integration_db.commit()
-            # If it doesn't fail, that's also valid (SQLite may not enforce FK)
-        except (IntegrityError, Exception):
+            # If commit succeeds, FK constraints may not be enforced (SQLite configuration)
+            pytest.skip("Database does not enforce foreign key constraints")
+        except IntegrityError:
+            # This is expected behavior - FK constraint was enforced
             integration_db.rollback()
-            # This is expected behavior
-            assert True
+            # Test passes - constraint was properly enforced
+            pass
 
 
 @pytest.mark.integration
@@ -307,19 +309,18 @@ class TestDatabaseDataIntegrity:
         integration_db.add(contact1)
         integration_db.commit()
         
-        # Try to create duplicate resource_name
-        try:
-            contact2 = Contact(
-                resource_name="people/unique_test",
-                display_name="Unique Test 2",
-            )
-            integration_db.add(contact2)
+        # Try to create duplicate resource_name - should raise IntegrityError
+        contact2 = Contact(
+            resource_name="people/unique_test",
+            display_name="Unique Test 2",
+        )
+        integration_db.add(contact2)
+        
+        with pytest.raises(IntegrityError):
             integration_db.commit()
-            # If no error, unique constraint might not be configured
-        except IntegrityError:
-            integration_db.rollback()
-            # This is expected behavior
-            assert True
+        
+        # Rollback the failed transaction
+        integration_db.rollback()
     
     def test_timestamp_fields_populated(self, integration_db):
         """Test that timestamp fields are properly populated."""

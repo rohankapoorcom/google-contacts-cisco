@@ -69,7 +69,7 @@ class TestContactsAPIIntegration:
         
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert data["id"] == contact.id
+        assert data["id"] == str(contact.id)
         assert data["display_name"] == contact.display_name
         assert data["resource_name"] == contact.resource_name
         
