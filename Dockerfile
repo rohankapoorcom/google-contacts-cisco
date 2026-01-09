@@ -4,7 +4,7 @@
 # =============================================================================
 # Stage 1: Build Frontend (Vue 3 + Vite + TypeScript)
 # =============================================================================
-FROM node:18-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /frontend
 
