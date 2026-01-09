@@ -181,6 +181,12 @@ class TestSyncTransactionHandling:
         with patch("google_contacts_cisco.auth.oauth.get_credentials", return_value=mock_credentials):
             response = integration_client.post("/api/sync/full")
         
+        # Sync should fail
+        assert response.status_code in [
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+        ]
+        
         # Verify contact count hasn't changed (transaction rolled back)
         final_count = integration_db.query(Contact).count()
         assert final_count == initial_count
@@ -263,6 +269,12 @@ class TestSyncPerformance:
             response = integration_client.post("/api/sync/full")
         
         duration = time.time() - start
+        
+        # Verify sync completed successfully
+        assert response.status_code in [
+            status.HTTP_200_OK,
+            status.HTTP_202_ACCEPTED,
+        ]
         
         # Sync should complete in reasonable time
         assert duration < 10.0  # Should complete in under 10 seconds for 100 contacts

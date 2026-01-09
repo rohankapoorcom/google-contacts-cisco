@@ -66,7 +66,8 @@ class TestXMLDirectoryAPIIntegration:
             name = entry.find("Name")
             telephone = entry.find("Telephone")
             assert name is not None
-            assert telephone is not None or len(entries) > 0
+            # Directory entries may not have telephone if contact has no phone numbers
+            assert telephone is not None or name is not None
     
     def test_xml_directory_search_endpoint(self, integration_client):
         """Test XML directory search endpoint exists."""

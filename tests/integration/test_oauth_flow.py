@@ -177,8 +177,9 @@ class TestOAuthTokenManagement:
         # Credentials should be refreshed when needed
         assert mock_creds.refresh_token is not None
     
+    @patch("google_contacts_cisco.auth.oauth.get_token_path")
     @patch("builtins.open", new_callable=mock_open)
-    def test_save_credentials_to_file(self, mock_file, temp_token_file):
+    def test_save_credentials_to_file(self, mock_file, mock_get_token_path, temp_token_file):
         """Test saving credentials to file."""
         from google_contacts_cisco.auth.oauth import save_credentials
         
@@ -188,13 +189,14 @@ class TestOAuthTokenManagement:
             "refresh_token": "test_refresh_token",
         })
         
-        # Test saving (implementation may vary)
-        # This tests the integration of file I/O with OAuth
-        try:
-            save_credentials(mock_creds, str(temp_token_file))
-        except Exception:
-            # Function may not exist or have different signature
-            pass
+        # Mock the token path
+        mock_get_token_path.return_value = temp_token_file
+        
+        # Test saving (save_credentials takes only credentials argument)
+        save_credentials(mock_creds)
+        
+        # Verify file was written
+        mock_file.assert_called_once_with(temp_token_file, "w")
 
 
 @pytest.mark.integration

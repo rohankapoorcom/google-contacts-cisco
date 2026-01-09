@@ -12,14 +12,14 @@ See test_database_transactions.py for working integration tests.
 """
 
 import pytest
-
-# Skip service integration tests pending service implementation fixes
-pytestmark = pytest.mark.skip(reason="Service integration requires implementation fixes")
 from unittest.mock import Mock, patch
 from datetime import datetime, timezone
 
 from google_contacts_cisco.models import Contact, PhoneNumber, SyncState
 from google_contacts_cisco.models.sync_state import SyncStatus
+
+# Skip service integration tests pending service implementation fixes
+pytestmark = pytest.mark.skip(reason="Service integration requires implementation fixes")
 
 
 @pytest.mark.integration

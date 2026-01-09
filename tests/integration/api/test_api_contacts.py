@@ -122,7 +122,7 @@ class TestContactsAPIIntegration:
 class TestContactsAPIErrorHandling:
     """Integration tests for error handling in contacts API."""
     
-    def test_database_error_handling(self, integration_client, monkeypatch):
+    def test_database_error_handling(self, integration_client):
         """Test that database errors are properly handled and propagated."""
         # This would test error propagation through the layers
         # For now, test that the API returns appropriate status codes

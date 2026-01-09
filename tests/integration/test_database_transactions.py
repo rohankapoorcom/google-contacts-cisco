@@ -126,10 +126,14 @@ class TestDatabaseTransactionIntegration:
         integration_db.delete(contact)
         integration_db.commit()
         
-        # Phone should be deleted (or orphaned depending on cascade rules)
+        # Verify cascade delete
         integration_db.expire_all()
         remaining_contact = integration_db.query(Contact).filter_by(id=contact_id).first()
         assert remaining_contact is None
+        
+        # Phone should be deleted due to cascade
+        remaining_phone = integration_db.query(PhoneNumber).filter_by(id=phone_id).first()
+        assert remaining_phone is None
     
     def test_foreign_key_constraint(self, integration_db):
         """Test that foreign key constraints are enforced."""
