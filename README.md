@@ -25,7 +25,7 @@ A comprehensive web application that synchronizes Google Contacts and serves the
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/rohankapoorcom/google-contacts-cisco.git
 cd google-contacts-cisco
 
 # Install dependencies

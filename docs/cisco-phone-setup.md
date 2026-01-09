@@ -584,7 +584,7 @@ For secure connections (recommended for production):
 
 The directory service supports optional parameters:
 
-```
+```text
 # Base directory
 http://YOUR_SERVER:8000/directory
 

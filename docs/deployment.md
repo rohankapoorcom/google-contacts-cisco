@@ -65,6 +65,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files
@@ -85,7 +86,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
-  CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+  CMD curl -f http://localhost:8000/health || exit 1
 
 # Run migrations and start server
 CMD ["sh", "-c", "uv run alembic upgrade head && uv run uvicorn google_contacts_cisco.main:app --host 0.0.0.0 --port 8000"]
@@ -229,7 +230,7 @@ sudo chown -R contacts:contacts /var/log/google-contacts-cisco
 ```bash
 # Clone repository
 cd /opt/google-contacts-cisco
-sudo -u contacts git clone <repository-url> .
+sudo -u contacts git clone https://github.com/rohankapoorcom/google-contacts-cisco.git .
 
 # Install dependencies
 sudo -u contacts python3 -m venv venv
@@ -664,7 +665,7 @@ sudo journalctl -u google-contacts-cisco > app.log
 
 Create `/etc/logrotate.d/google-contacts-cisco`:
 
-```
+```logrotate
 /var/log/google-contacts-cisco/*.log {
     daily
     missingok

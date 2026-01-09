@@ -223,7 +223,7 @@ uv run alembic upgrade head
 ```
 
 You should see output like:
-```
+```text
 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
 INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
 INFO  [alembic.runtime.migration] Running upgrade  -> 3b6d750552da, initial_schema
@@ -238,7 +238,7 @@ To access Google Contacts, you need to create OAuth 2.0 credentials in the Googl
 ### Step 1: Create a Google Cloud Project
 
 1. **Go to Google Cloud Console**
-   - Visit: https://console.cloud.google.com/
+   - Visit: [https://console.cloud.google.com/](https://console.cloud.google.com/)
 
 2. **Create New Project**
    - Click "Select a project" → "New Project"
@@ -341,7 +341,7 @@ uv run python -m google_contacts_cisco.config_utils
 ```
 
 You should see:
-```
+```text
 ✓ Google OAuth credentials configured
 ✓ Database configured
 ✓ Configuration valid
@@ -364,7 +364,7 @@ uv run uvicorn google_contacts_cisco.main:app --reload --host 0.0.0.0 --port 800
 ```
 
 You should see output like:
-```
+```text
 INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
 INFO:     Started reloader process [12345] using StatReload
 INFO:     Started server process [12346]
@@ -406,7 +406,7 @@ docker run -d \
 
 ### 1. Open Application
 
-Visit http://localhost:8000 in your browser.
+Visit [http://localhost:8000](http://localhost:8000) in your browser.
 
 ### 2. Check Health
 
@@ -429,7 +429,7 @@ Expected response:
 
 #### Option A: Using Browser
 
-1. Visit: http://localhost:8000/auth/google
+1. Visit: [http://localhost:8000/auth/google](http://localhost:8000/auth/google)
 2. Sign in with your Google account
 3. Grant permissions to access contacts (read-only)
 4. You'll be redirected back with a success message
@@ -721,8 +721,8 @@ Now that you have the application running, you can:
 
 ### Interactive Tools
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
 ### Logs
 

@@ -23,7 +23,7 @@ OAuth 2.0 is an authorization framework that enables applications to obtain limi
 
 ### Flow Diagram
 
-```
+```plaintext
 ┌─────────┐                                           ┌───────────┐
 │         │  1. Initiate OAuth (GET /auth/google)   │           │
 │  User   │──────────────────────────────────────────>│    App    │
