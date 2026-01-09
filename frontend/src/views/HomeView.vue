@@ -5,7 +5,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { api } from '@/api/client'
-import type { SyncInfo, OAuthStatus } from '@/types/api'
+import type { OAuthStatus } from '@/types/api'
 
 interface SystemStatus {
   total_contacts: number
@@ -46,19 +46,19 @@ const features = [
 ]
 
 onMounted(async () => {
-  // Fetch sync info and OAuth status in parallel
-  const [syncInfo, oauthStatus] = await Promise.allSettled([
-    api.getSyncInfo(),
+  // Fetch sync status and OAuth status in parallel
+  const [syncStatusResult, oauthStatus] = await Promise.allSettled([
+    api.getSyncStatus(),
     api.getOAuthStatus(),
   ])
 
-  // Handle sync info
-  if (syncInfo.status === 'fulfilled') {
-    const info = syncInfo.value as SyncInfo
+  // Handle sync status
+  if (syncStatusResult.status === 'fulfilled') {
+    const info = syncStatusResult.value
     status.value.total_contacts = info.total_contacts
-    status.value.last_sync = info.last_sync
+    status.value.last_sync = info.last_sync_at
   } else {
-    console.error('Failed to load sync info:', syncInfo.reason)
+    console.error('Failed to load sync status:', syncStatusResult.reason)
     status.value.error = 'Failed to load system status'
   }
 

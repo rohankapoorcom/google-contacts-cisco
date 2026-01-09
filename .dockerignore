@@ -1,0 +1,110 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+frontend/dist/
+frontend/.nuxt/
+frontend/.output/
+frontend/.vite/
+frontend/.next/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data and logs (exclude from image, use volumes)
+data/
+logs/
+*.db
+*.db-journal
+*.log
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Testing
+tests/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Database
+*.sqlite
+*.sqlite3
+# Note: alembic/versions/*.py are needed for runtime migrations, do NOT exclude them
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+.cache/
+
+# Beads
+.beads/
+
+# AI
+.ai/
+
+# Scripts (except entrypoint.sh which is needed)
+scripts/
+!entrypoint.sh
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
