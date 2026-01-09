@@ -108,7 +108,6 @@ async function disconnect() {
 // Lifecycle hooks
 onMounted(async () => {
   // Handle OAuth callback query parameters
-  const code = route.query.code as string | undefined
   const errorParam = route.query.error as string | undefined
 
   if (errorParam) {

@@ -29,7 +29,7 @@ const initials = computed(() => {
     return '?'
   }
   const parts = props.contact.display_name.split(' ')
-  if (parts.length === 1) {
+  if (parts.length === 1 && parts[0]) {
     return parts[0].substring(0, 2).toUpperCase()
   }
   const first = parts[0]?.[0] || ''

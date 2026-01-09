@@ -54,8 +54,8 @@ const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('')
 
 const displayedContacts = computed(() => {
   if (isSearchMode.value) {
-    // In search mode, show search results (converted to Contact type)
-    return searchResults.value.map(r => r.contact)
+    // In search mode, show search results (SearchResult has same structure as Contact)
+    return searchResults.value as Contact[]
   }
   return contacts.value
 })

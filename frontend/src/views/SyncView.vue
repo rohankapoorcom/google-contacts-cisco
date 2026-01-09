@@ -15,7 +15,6 @@ import type {
   SyncStatus,
   SyncStatisticsResponse,
   SyncHistoryResponse,
-  SyncTriggerResponse,
   OAuthStatus,
 } from '@/types/api'
 

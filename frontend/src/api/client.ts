@@ -8,7 +8,6 @@ import type {
   Contact,
   SearchResponse,
   SyncStatus,
-  SyncInfo,
   SyncTriggerResponse,
   SyncHistoryResponse,
   SyncStatisticsResponse,
