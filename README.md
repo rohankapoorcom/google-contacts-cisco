@@ -45,7 +45,7 @@ uv run alembic upgrade head
 uv run uvicorn google_contacts_cisco.main:app --reload
 ```
 
-Visit http://localhost:8000/docs for interactive API documentation.
+Visit [http://localhost:8000/docs](http://localhost:8000/docs) for interactive API documentation.
 
 ## Documentation
 
@@ -97,8 +97,8 @@ Comprehensive documentation is available in the `docs/` directory:
 - `GET /directory/contacts/{id}` - Contact directory
 
 For detailed API documentation, visit:
-- **Interactive Docs**: http://localhost:8000/docs (Swagger UI)
-- **Alternative Docs**: http://localhost:8000/redoc (ReDoc)
+- **Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
+- **Alternative Docs**: [http://localhost:8000/redoc](http://localhost:8000/redoc) (ReDoc)
 - **Full API Guide**: [docs/api.md](docs/api.md)
 
 ## Development Setup
@@ -183,7 +183,7 @@ See [Configuration Guide](docs/configuration.md) for all available options.
 
 ## Architecture
 
-```
+```plaintext
 ┌─────────────────┐
 │  Vue 3 Frontend │ ← User interface
 └────────┬────────┘
@@ -259,7 +259,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Support
 
 - **Documentation**: [docs/](docs/)
-- **API Reference**: http://localhost:8000/docs
+- **API Reference**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **Troubleshooting**: [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ## Acknowledgments

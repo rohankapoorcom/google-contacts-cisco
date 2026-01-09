@@ -849,9 +849,9 @@ findtime = 600
 
 4. **Use HTTPS** ✓ (configured in nginx)
 
-5. **Rate Limiting** (future enhancement)
-   - Add rate limiting middleware
-   - Or use nginx rate limiting
+5. **Rate-Limiting** (future enhancement)
+   - Add rate-limiting middleware
+   - Or use nginx rate-limiting
 
 6. **Security Headers** ✓ (configured in nginx)
 

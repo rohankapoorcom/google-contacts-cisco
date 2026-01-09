@@ -112,7 +112,7 @@ For issues and questions, check the troubleshooting guide or review application 
     lifespan=lifespan,
     contact={
         "name": "Google Contacts Cisco Support",
-        "url": "https://github.com/your-repo/google-contacts-cisco",
+        "url": "https://github.com/rohankapoorcom/google-contacts-cisco",
     },
     license_info={
         "name": "MIT License",
