@@ -1,0 +1,52 @@
+# Docker Compose for Production
+# This configuration is optimized for production deployment
+version: '3.8'
+
+services:
+  # Main application container
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: google-contacts-cisco
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data (use named volumes in production)
+      - app-data:/app/data
+      - app-logs:/app/logs
+      # Environment configuration (read-only)
+      - ./.env:/app/.env:ro
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=sqlite:///./data/contacts.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Security: Drop all capabilities except what's needed
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  app-data:
+    driver: local
+  app-logs:
+    driver: local

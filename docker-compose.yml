@@ -1,0 +1,41 @@
+# Docker Compose for Development
+# This configuration is optimized for local development with hot-reloading
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: google-contacts-cisco-dev
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot-reloading (development only)
+      - ./google_contacts_cisco:/app/google_contacts_cisco
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      # Persistent data
+      - ./data:/app/data
+      - ./logs:/app/logs
+      # Environment configuration
+      - ./.env:/app/.env:ro
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DATABASE_URL=sqlite:///./data/contacts.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

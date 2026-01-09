@@ -11,7 +11,8 @@ A comprehensive web application that synchronizes Google Contacts and serves the
 - 🔍 **Full-Text Search**: Fast contact search by name and phone number
 - 🎨 **Modern Frontend**: Vue 3 + TypeScript web interface
 - 📊 **Sync Management**: Real-time status, statistics, and history tracking
-- 🚀 **Production Ready**: Docker support, systemd service, nginx configuration
+- 🐳 **Docker Support**: Pre-built images published via GitHub Actions
+- 🚀 **Production Ready**: Systemd service, reverse proxy support
 
 ## Quick Start
 
@@ -140,6 +141,26 @@ pytest --cov=google_contacts_cisco --cov-report=html
 
 ### Docker
 
+Pre-built Docker images are automatically published via GitHub Actions and available on GitHub Container Registry.
+
+#### Using Pre-built Images
+
+```bash
+# Pull latest image (main branch)
+docker pull ghcr.io/rohankapoorcom/google-contacts-cisco:main
+
+# Or pull a specific version
+docker pull ghcr.io/rohankapoorcom/google-contacts-cisco:0.1.0
+
+# Run with docker-compose
+# Update docker-compose.prod.yml to use: image: ghcr.io/rohankapoorcom/google-contacts-cisco:main
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+**Note**: Version numbers are automatically bumped on every push to main. Images are tagged with both the branch name (`main`) and the version number (e.g., `0.1.0`).
+
+#### Building Locally
+
 ```bash
 # Build and run with Docker Compose
 docker-compose up -d
@@ -151,9 +172,15 @@ docker-compose logs -f app
 docker-compose down
 ```
 
+See [DOCKER.md](DOCKER.md) for comprehensive Docker deployment guide including:
+- Configuration options
+- Reverse proxy setup (nginx, Caddy, Traefik)
+- Backup and restore procedures
+- Troubleshooting
+
 ### Systemd Service
 
-See [Deployment Guide](docs/deployment.md) for complete systemd service setup, nginx configuration, and SSL/TLS setup with Let's Encrypt.
+See [Deployment Guide](docs/deployment.md) for complete systemd service setup and production configuration.
 
 ## Configuration
 
