@@ -9,6 +9,9 @@ import type {
   SearchResponse,
   SyncStatus,
   SyncInfo,
+  SyncTriggerResponse,
+  SyncHistoryResponse,
+  SyncStatisticsResponse,
   OAuthStatus,
   HealthResponse,
   ContactStats,
@@ -125,20 +128,52 @@ class ApiClient {
   }
 
   /**
-   * Get sync information (last sync, contact count, etc.).
+   * Trigger automatic synchronization (chooses full or incremental).
    */
-  async getSyncInfo(): Promise<SyncInfo> {
-    const response = await this.client.get<SyncInfo>('/api/sync/info')
+  async triggerSync(): Promise<SyncTriggerResponse> {
+    const response = await this.client.post<SyncTriggerResponse>('/api/sync')
     return response.data
   }
 
   /**
-   * Trigger a contact synchronization.
+   * Trigger a full synchronization (re-sync all contacts).
    */
-  async triggerSync(forceFull: boolean = false): Promise<{ message: string }> {
-    const response = await this.client.post('/api/sync/trigger', null, {
-      params: { force_full: forceFull },
+  async triggerFullSync(): Promise<SyncTriggerResponse> {
+    const response = await this.client.post<SyncTriggerResponse>('/api/sync/full')
+    return response.data
+  }
+
+  /**
+   * Trigger an incremental synchronization (only changed contacts).
+   */
+  async triggerIncrementalSync(): Promise<SyncTriggerResponse> {
+    const response = await this.client.post<SyncTriggerResponse>('/api/sync/incremental')
+    return response.data
+  }
+
+  /**
+   * Get sync history.
+   */
+  async getSyncHistory(limit: number = 10): Promise<SyncHistoryResponse> {
+    const response = await this.client.get<SyncHistoryResponse>('/api/sync/history', {
+      params: { limit },
     })
+    return response.data
+  }
+
+  /**
+   * Get comprehensive sync statistics.
+   */
+  async getSyncStatistics(): Promise<SyncStatisticsResponse> {
+    const response = await this.client.get<SyncStatisticsResponse>('/api/sync/statistics')
+    return response.data
+  }
+
+  /**
+   * Check if a full sync is needed.
+   */
+  async checkNeedsSync(): Promise<{ needs_full_sync: boolean; reason: string }> {
+    const response = await this.client.get<{ needs_full_sync: boolean; reason: string }>('/api/sync/needs-sync')
     return response.data
   }
 
