@@ -98,6 +98,9 @@ const canSync = computed(() => {
 // Methods
 // =====================
 
+let refreshTimeout: number | null = null
+let pollingInFlight = false
+
 async function loadData() {
   try {
     loading.value = true
@@ -150,10 +153,10 @@ async function triggerAutoSync() {
     startPolling()
     
     // Reload data after a short delay
-    setTimeout(loadData, 1000)
+    if (refreshTimeout) clearTimeout(refreshTimeout)
+    refreshTimeout = window.setTimeout(loadData, 1000)
   } catch (err: any) {
     error.value = err.response?.data?.detail || err.message || 'Failed to trigger sync'
-  } finally {
     syncing.value = false
   }
 }
@@ -177,10 +180,10 @@ async function triggerFullSync() {
     startPolling()
     
     // Reload data after a short delay
-    setTimeout(loadData, 1000)
+    if (refreshTimeout) clearTimeout(refreshTimeout)
+    refreshTimeout = window.setTimeout(loadData, 1000)
   } catch (err: any) {
     error.value = err.response?.data?.detail || err.message || 'Failed to trigger full sync'
-  } finally {
     syncing.value = false
   }
 }
@@ -200,10 +203,10 @@ async function triggerIncrementalSync() {
     startPolling()
     
     // Reload data after a short delay
-    setTimeout(loadData, 1000)
+    if (refreshTimeout) clearTimeout(refreshTimeout)
+    refreshTimeout = window.setTimeout(loadData, 1000)
   } catch (err: any) {
     error.value = err.response?.data?.detail || err.message || 'Failed to trigger incremental sync'
-  } finally {
     syncing.value = false
   }
 }
@@ -212,6 +215,10 @@ function startPolling() {
   if (pollInterval) return
   
   pollInterval = window.setInterval(async () => {
+    // Skip if previous poll is still in flight
+    if (pollingInFlight) return
+    
+    pollingInFlight = true
     try {
       const status = await api.getSyncStatus()
       syncStatus.value = status
@@ -219,11 +226,14 @@ function startPolling() {
       // Stop polling if sync is complete
       if (status.status !== 'syncing') {
         stopPolling()
+        syncing.value = false
         await loadData()
       }
     } catch (err) {
       // Silently fail - don't interrupt user experience
       console.error('Polling error:', err)
+    } finally {
+      pollingInFlight = false
     }
   }, 2000) // Poll every 2 seconds
 }
@@ -233,6 +243,7 @@ function stopPolling() {
     clearInterval(pollInterval)
     pollInterval = null
   }
+  pollingInFlight = false
 }
 
 function formatDate(dateStr?: string): string {
@@ -259,6 +270,10 @@ onMounted(() => {
 
 onUnmounted(() => {
   stopPolling()
+  if (refreshTimeout) {
+    clearTimeout(refreshTimeout)
+    refreshTimeout = null
+  }
 })
 </script>
 
