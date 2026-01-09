@@ -77,25 +77,22 @@ class TestSyncServiceIntegration:
         sync_state = integration_db.query(SyncState).first()
         assert sync_state is not None
     
-    @patch("google_contacts_cisco.services.google_client.GoogleContactsClient")
     def test_incremental_sync_updates_existing(
-        self, mock_google_client_class, integration_db, integration_test_contacts,
-        integration_sync_state, mock_credentials
+        self, integration_db, integration_test_contacts, integration_sync_state, mock_credentials
     ):
         """Test incremental sync updates existing contacts."""
         from google_contacts_cisco.services.sync_service import SyncService
         
         # Get existing contact
         existing_contact = integration_test_contacts[0]
-        original_name = existing_contact.display_name
         
-        # Set up mock to return update
+        # Set up mock client to return update
         mock_client = Mock()
         mock_client.fetch_contact_updates.return_value = (
             [
                 {
                     "resourceName": existing_contact.resource_name,
-                    "etag": "updated_etag",
+                    "etag": "updated_etag_new",
                     "names": [
                         {
                             "displayName": "Updated Name via Sync",
@@ -108,7 +105,6 @@ class TestSyncServiceIntegration:
             ],
             "new_sync_token_123",
         )
-        mock_google_client_class.return_value = mock_client
         
         # Perform incremental sync (service creates repositories internally)
         with patch("google_contacts_cisco.auth.oauth.get_credentials", return_value=mock_credentials):
@@ -121,9 +117,16 @@ class TestSyncServiceIntegration:
             resource_name=existing_contact.resource_name
         ).first()
         
-        # Name should be updated if sync succeeded
-        # (depends on implementation details)
         assert updated_contact is not None
+        # Verify the contact data was actually updated
+        assert updated_contact.display_name == "Updated Name via Sync"
+        assert updated_contact.etag == "updated_etag_new"
+        
+        # Verify sync state was updated with new token
+        integration_db.expire_all()
+        updated_sync_state = integration_db.query(SyncState).first()
+        assert updated_sync_state is not None
+        assert updated_sync_state.sync_token == "new_sync_token_123"
 
 
 @pytest.mark.integration
@@ -318,43 +321,37 @@ class TestContactTransformerIntegration:
 class TestServiceErrorPropagation:
     """Integration tests for error propagation through services."""
     
-    @patch("google_contacts_cisco.services.google_client.GoogleContactsClient")
     def test_sync_service_handles_google_api_error(
-        self, mock_google_client_class, integration_db, mock_credentials
+        self, integration_db, mock_credentials
     ):
         """Test that sync service properly handles Google API errors."""
         from google_contacts_cisco.services.sync_service import SyncService
-        from google_contacts_cisco.repositories.sync_repository import SyncRepository
-        from google_contacts_cisco.repositories.contact_repository import ContactRepository
+        from google_contacts_cisco.services.google_client import GoogleClientError
         
         # Set up mock to raise error
         mock_client = Mock()
-        mock_client.fetch_all_contacts.side_effect = Exception("Google API Error")
-        mock_google_client_class.return_value = mock_client
+        mock_client.fetch_all_contacts.side_effect = GoogleClientError("Google API Error")
         
-        sync_repo = SyncRepository(integration_db)
-        contact_repo = ContactRepository(integration_db)
-        
-        # Attempt sync
-        with pytest.raises(Exception):
+        # Attempt sync - should raise GoogleClientError
+        with pytest.raises(GoogleClientError):
             with patch("google_contacts_cisco.auth.oauth.get_credentials", return_value=mock_credentials):
-                sync_service = SyncService(integration_db, sync_repo, contact_repo)
-                sync_service.perform_full_sync()
+                sync_service = SyncService(integration_db, google_client=mock_client)
+                sync_service.full_sync()
     
     def test_search_service_handles_database_error(self, integration_db):
         """Test that search service handles database errors."""
         from google_contacts_cisco.services.search_service import SearchService
         from google_contacts_cisco.repositories.contact_repository import ContactRepository
+        from sqlalchemy.exc import OperationalError
         
         contact_repo = ContactRepository(integration_db)
         search_service = SearchService(contact_repo)
         
-        # Close database to cause error
-        integration_db.close()
-        
-        # Attempt search - should handle gracefully or raise appropriate error
-        with pytest.raises(Exception):
-            search_service.search("test")
+        # Mock the repository method to raise a database error
+        with patch.object(contact_repo, 'search_contacts', side_effect=OperationalError("Mock DB error", None, None)):
+            # Attempt search - should raise OperationalError
+            with pytest.raises(OperationalError):
+                search_service.search("test")
 
 
 @pytest.mark.integration
