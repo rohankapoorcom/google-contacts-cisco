@@ -82,6 +82,8 @@ Download and install [Docker Desktop for Windows](https://docs.docker.com/deskto
 
 ### Environment Variables
 
+**Important**: A `.env` file is required before running the Docker containers. The Docker Compose configurations mount this file as a read-only volume.
+
 Copy `.env.example` to `.env` and configure:
 
 ```bash
@@ -268,7 +270,7 @@ Images are automatically published to GitHub Container Registry with the followi
 ```yaml
 services:
   app:
-    image: ghcr.io/OWNER/REPO:latest
+    image: ghcr.io/rohankapoorcom/google-contacts-cisco:main
     # ... rest of configuration
 ```
 
