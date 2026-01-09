@@ -76,10 +76,70 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title=settings.app_name,
-    description="Web application for syncing Google Contacts to Cisco IP Phones",
+    description="""
+# Google Contacts to Cisco IP Phone Application
+
+A comprehensive web application that syncs Google Contacts and serves them to Cisco IP Phones via XML directory service.
+
+## Features
+
+* **OAuth 2.0 Authentication**: Secure integration with Google Contacts API
+* **Automatic Synchronization**: Full and incremental sync support with scheduling
+* **REST API**: Complete API for contact management and search
+* **Cisco XML Directory**: Three-level hierarchy for Cisco IP Phones
+* **Full-Text Search**: Fast contact search by name and phone number
+* **Modern Frontend**: Vue 3 web interface for management
+
+## Getting Started
+
+1. **Authenticate**: Complete OAuth flow via `/auth/google`
+2. **Sync Contacts**: Trigger sync with `POST /api/sync`
+3. **Configure Phones**: Point Cisco phones to `/directory`
+
+## Documentation
+
+* **Interactive Docs**: [/docs](/docs) (Swagger UI)
+* **Alternative Docs**: [/redoc](/redoc) (ReDoc)
+* **API Guide**: See documentation folder for detailed guides
+* **Postman Collection**: Available in docs/postman/
+
+## Support
+
+For issues and questions, check the troubleshooting guide or review application logs.
+    """,
     version=__version__,
     debug=settings.debug,
     lifespan=lifespan,
+    contact={
+        "name": "Google Contacts Cisco Support",
+        "url": "https://github.com/rohankapoorcom/google-contacts-cisco",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    openapi_tags=[
+        {
+            "name": "authentication",
+            "description": "OAuth 2.0 authentication with Google. Complete the OAuth flow to access Google Contacts API.",
+        },
+        {
+            "name": "contacts",
+            "description": "Contact management endpoints. List, search, and retrieve contact information.",
+        },
+        {
+            "name": "synchronization",
+            "description": "Sync operations with Google Contacts. Supports full and incremental synchronization.",
+        },
+        {
+            "name": "Cisco Directory",
+            "description": "XML directory endpoints for Cisco IP Phones. Provides three-level hierarchy (main → group → contact).",
+        },
+        {
+            "name": "google",
+            "description": "Google API integration and connection testing.",
+        },
+    ],
 )
 
 # CORS middleware (for development)
