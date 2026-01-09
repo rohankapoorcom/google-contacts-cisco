@@ -113,6 +113,10 @@ async function loadData() {
     
     if (statusRes.status === 'fulfilled') {
       syncStatus.value = statusRes.value
+    } else {
+      console.error('Failed to load sync status:', statusRes.reason)
+      const err = statusRes.reason as any
+      error.value = err.response?.data?.detail || err.message || 'Failed to load sync data'
     }
     
     if (statsRes.status === 'fulfilled') {
@@ -126,8 +130,6 @@ async function loadData() {
     if (oauthRes.status === 'fulfilled') {
       oauthStatus.value = oauthRes.value
     }
-  } catch (err: any) {
-    error.value = err.response?.data?.detail || err.message || 'Failed to load sync data'
   } finally {
     loading.value = false
   }
