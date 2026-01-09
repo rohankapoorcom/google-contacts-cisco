@@ -17,8 +17,8 @@ RUN npm ci
 # Copy frontend source
 COPY frontend/ ./
 
-# Build frontend for production
-RUN npm run build
+# Build frontend for production (override outDir to build in container)
+RUN npm run build -- --outDir=dist
 
 # Verify build output
 RUN ls -la /frontend/dist && \
