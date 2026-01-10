@@ -310,5 +310,3 @@ async def search_contacts_by_phone(
             status_code=500,
             detail=f"Phone search failed: {str(e)}",
         ) from e
-
-

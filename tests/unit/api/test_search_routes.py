@@ -323,7 +323,7 @@ class TestSearchContactsByPhone:
 
 class TestGetContact:
     """Tests for /api/contacts/{contact_id} endpoint.
-    
+
     NOTE: This endpoint is now handled by contacts.py, not search_routes.py.
     These tests verify the endpoint still works after the route was moved.
     """
@@ -395,7 +395,7 @@ class TestGetContact:
 
 class TestListContacts:
     """Tests for /api/contacts (list) endpoint.
-    
+
     NOTE: This endpoint is now handled by contacts.py, not search_routes.py.
     These tests verify the endpoint still works after the route was moved.
     """
