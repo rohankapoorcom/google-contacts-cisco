@@ -100,7 +100,7 @@ class SyncStatistics:
             result["peak_memory_mb"] = round(self.peak_memory_mb, 2)
         if self.start_memory_mb is not None:
             result["start_memory_mb"] = round(self.start_memory_mb, 2)
-        if self.peak_memory_mb and self.start_memory_mb:
+        if self.peak_memory_mb is not None and self.start_memory_mb is not None:
             result["memory_delta_mb"] = round(
                 self.peak_memory_mb - self.start_memory_mb, 2
             )
