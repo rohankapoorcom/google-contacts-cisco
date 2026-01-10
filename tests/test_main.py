@@ -46,6 +46,18 @@ def test_health():
     assert "config_errors" in data
 
 
+def test_health_version_matches():
+    """Test that health endpoint returns the correct version from _version.py."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["version"] == __version__
+    # Verify version format is semantic versioning (X.Y.Z)
+    version_parts = data["version"].split(".")
+    assert len(version_parts) == 3
+    assert all(part.isdigit() for part in version_parts)
+
+
 def test_version():
     """Test version is available."""
     assert __version__ is not None

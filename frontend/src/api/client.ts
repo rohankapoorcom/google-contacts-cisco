@@ -67,6 +67,15 @@ class ApiClient {
     return response.data
   }
 
+  /**
+   * Get the application version from the backend.
+   * This is a convenience method that extracts just the version from the health endpoint.
+   */
+  async getVersion(): Promise<string> {
+    const health = await this.getHealth()
+    return health.version
+  }
+
   // =====================
   // Contacts
   // =====================
