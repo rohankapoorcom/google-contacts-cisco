@@ -163,7 +163,7 @@ class CiscoXMLFormatter:
                 name.text = phone_label
 
                 telephone = etree.SubElement(entry, "Telephone")
-                telephone.text = phone.display_value
+                telephone.text = self._format_phone_for_cisco(phone.display_value)
         else:
             # No phone numbers
             entry = etree.SubElement(root, "DirectoryEntry")
@@ -201,6 +201,86 @@ class CiscoXMLFormatter:
         call_url.text = "SoftKey:Select"
 
         return self._to_xml_string(root)
+
+    def _format_phone_for_cisco(self, display_value: str) -> str:
+        """Format phone number for Cisco IP Phone display.
+
+        Normalizes phone numbers to a consistent format compatible with
+        Cisco IP Phone dialplan:
+        - Removes + prefix (breaks Cisco dialplan)
+        - Removes special characters (parentheses, dashes, dots)
+        - Formats with spaces for readability
+        - US/Canada 11-digit: "1 XXX XXX XXXX"
+        - US/Canada 10-digit: "XXX XXX XXXX"
+        - International: digits with spaces
+
+        Args:
+            display_value: Original phone number display value
+
+        Returns:
+            Formatted phone number suitable for Cisco phones
+        """
+        if not display_value:
+            return ""
+
+        # Extract only digits from the phone number
+        digits = "".join(c for c in display_value if c.isdigit())
+
+        if not digits:
+            return ""
+
+        # Format based on length
+        length = len(digits)
+
+        if length == 11 and digits[0] == "1":
+            # US/Canada with country code: 1 XXX XXX XXXX
+            return f"{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:]}"
+        elif length == 10:
+            # US/Canada without country code: XXX XXX XXXX
+            return f"{digits[0:3]} {digits[3:6]} {digits[6:]}"
+        elif length > 11:
+            # International numbers - format with spaces every 2-3 digits
+            # Try to detect country code length (1-3 digits typically)
+            if digits[0] == "1":
+                # Likely North America
+                cc_len = 1
+            elif digits[0:2] in ["44", "33", "49", "39", "91", "86", "81", "82"]:
+                # Common 2-digit country codes
+                cc_len = 2
+            elif digits[0:3] in ["358", "420", "421"]:
+                # Common 3-digit country codes
+                cc_len = 3
+            else:
+                # Default to 2-digit country code
+                cc_len = 2
+
+            # Format: CC + space-separated groups
+            result = digits[0:cc_len]
+            remaining = digits[cc_len:]
+
+            # Group remaining digits in chunks of 3 or 4
+            while remaining:
+                if len(remaining) <= 4:
+                    result += f" {remaining}"
+                    break
+                else:
+                    chunk_size = 3 if len(remaining) > 4 else 2
+                    result += f" {remaining[:chunk_size]}"
+                    remaining = remaining[chunk_size:]
+
+            return result
+        else:
+            # Shorter numbers (7 digits or less) - format as XXX XXXX or as-is
+            if length == 7:
+                return f"{digits[0:3]} {digits[3:]}"
+            else:
+                # Return digits with space every 3 digits
+                result = ""
+                for i, digit in enumerate(digits):
+                    if i > 0 and i % 3 == 0:
+                        result += " "
+                    result += digit
+                return result
 
     def map_contact_to_group(self, contact: "Contact") -> str:
         """Map contact to appropriate group based on first character.

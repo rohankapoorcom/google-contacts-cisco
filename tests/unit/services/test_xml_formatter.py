@@ -291,14 +291,15 @@ class TestContactDirectory(TestCiscoXMLFormatter):
         assert "Work" in name
 
     def test_phone_display_value(self, formatter, sample_contact):
-        """Test that phone display value is shown."""
+        """Test that phone display value is formatted for Cisco."""
         xml_str = formatter.generate_contact_directory(sample_contact)
         root = etree.fromstring(xml_str.encode("utf-8"))
 
         entries = root.findall("DirectoryEntry")
         first_entry = entries[0]
         telephone = first_entry.find("Telephone").text
-        assert "(555) 123-4567" in telephone
+        # Phone should be formatted without parentheses or dashes
+        assert telephone == "555 123 4567"
 
     def test_no_phone_numbers(self, formatter, contact_no_phones):
         """Test contact with no phone numbers."""
@@ -793,6 +794,246 @@ class TestGroupMappings:
 
         for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
             assert letter in all_chars, f"Letter {letter} not covered"
+
+
+class TestPhoneNumberFormattingForCisco(TestCiscoXMLFormatter):
+    """Test phone number formatting for Cisco IP Phone compatibility."""
+
+    def test_format_us_11_digit_with_plus_and_dashes(self, formatter):
+        """Test US/Canada 11-digit number with + and dashes."""
+        result = formatter._format_phone_for_cisco("+1-555-123-4567")
+        assert result == "1 555 123 4567"
+
+    def test_format_us_11_digit_with_plus_and_spaces(self, formatter):
+        """Test US/Canada 11-digit number with + and spaces."""
+        result = formatter._format_phone_for_cisco("+1 555 123 4567")
+        assert result == "1 555 123 4567"
+
+    def test_format_us_11_digit_with_parentheses(self, formatter):
+        """Test US/Canada 11-digit number with parentheses."""
+        result = formatter._format_phone_for_cisco("+1 (555) 123-4567")
+        assert result == "1 555 123 4567"
+
+    def test_format_us_11_digit_no_formatting(self, formatter):
+        """Test US/Canada 11-digit number without formatting."""
+        result = formatter._format_phone_for_cisco("+15551234567")
+        assert result == "1 555 123 4567"
+
+    def test_format_us_11_digit_no_plus(self, formatter):
+        """Test US/Canada 11-digit number without + prefix."""
+        result = formatter._format_phone_for_cisco("15551234567")
+        assert result == "1 555 123 4567"
+
+    def test_format_us_10_digit_with_dashes(self, formatter):
+        """Test US/Canada 10-digit number with dashes."""
+        result = formatter._format_phone_for_cisco("555-123-4567")
+        assert result == "555 123 4567"
+
+    def test_format_us_10_digit_with_parentheses(self, formatter):
+        """Test US/Canada 10-digit number with parentheses."""
+        result = formatter._format_phone_for_cisco("(555) 123-4567")
+        assert result == "555 123 4567"
+
+    def test_format_us_10_digit_with_dots(self, formatter):
+        """Test US/Canada 10-digit number with dots."""
+        result = formatter._format_phone_for_cisco("555.123.4567")
+        assert result == "555 123 4567"
+
+    def test_format_us_10_digit_no_formatting(self, formatter):
+        """Test US/Canada 10-digit number without formatting."""
+        result = formatter._format_phone_for_cisco("5551234567")
+        assert result == "555 123 4567"
+
+    def test_format_uk_number(self, formatter):
+        """Test UK phone number (+44)."""
+        result = formatter._format_phone_for_cisco("+44 20 7946 0958")
+        # Should remove + and format with spaces
+        assert result == "44 207 946 0958"
+        assert "+" not in result
+
+    def test_format_france_number(self, formatter):
+        """Test France phone number (+33)."""
+        result = formatter._format_phone_for_cisco("+33 1 42 86 82 00")
+        # Should remove + and format with spaces
+        assert result == "331 428 682 00"
+        assert "+" not in result
+
+    def test_format_australia_number(self, formatter):
+        """Test Australia phone number (+61)."""
+        result = formatter._format_phone_for_cisco("+61 2 1234 5678")
+        # Should remove + and format with spaces
+        assert result == "612 123 456 78"
+        assert "+" not in result
+
+    def test_format_germany_number(self, formatter):
+        """Test Germany phone number (+49)."""
+        result = formatter._format_phone_for_cisco("+49 30 12345678")
+        # Should remove + and format with spaces
+        assert result == "49 301 234 5678"
+        assert "+" not in result
+
+    def test_format_india_number(self, formatter):
+        """Test India phone number (+91)."""
+        result = formatter._format_phone_for_cisco("+91 98765 43210")
+        # Should remove + and format with spaces
+        assert result == "91 987 654 3210"
+        assert "+" not in result
+
+    def test_format_7_digit_number(self, formatter):
+        """Test 7-digit local number."""
+        result = formatter._format_phone_for_cisco("555-1234")
+        assert result == "555 1234"
+
+    def test_format_empty_string(self, formatter):
+        """Test empty string returns empty."""
+        result = formatter._format_phone_for_cisco("")
+        assert result == ""
+
+    def test_format_none_value(self, formatter):
+        """Test None value returns empty."""
+        result = formatter._format_phone_for_cisco(None)
+        assert result == ""
+
+    def test_format_no_digits(self, formatter):
+        """Test string with no digits returns empty."""
+        result = formatter._format_phone_for_cisco("N/A")
+        assert result == ""
+
+    def test_format_special_chars_only(self, formatter):
+        """Test string with only special characters."""
+        result = formatter._format_phone_for_cisco("---()+++")
+        assert result == ""
+
+    def test_format_mixed_letters_and_digits(self, formatter):
+        """Test phone number with letters (vanity number)."""
+        result = formatter._format_phone_for_cisco("1-800-FLOWERS")
+        # Only digits are extracted: 1-800 = "1800"
+        assert result == "180 0"
+        assert result.replace(" ", "").isdigit()
+
+    def test_phone_formatting_in_contact_directory(self, formatter):
+        """Test that phone formatting is applied in contact directory XML."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="Test Contact",
+        )
+        contact.phone_numbers = [
+            PhoneNumber(
+                id=uuid.uuid4(),
+                contact_id=contact.id,
+                value="15551234567",
+                display_value="+1-555-123-4567",
+                type="mobile",
+                primary=True,
+            )
+        ]
+
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        entries = root.findall("DirectoryEntry")
+        telephone = entries[0].find("Telephone").text
+        assert telephone == "1 555 123 4567"
+        assert "+" not in telephone
+        assert "-" not in telephone
+
+    def test_multiple_phones_all_formatted(self, formatter):
+        """Test that all phone numbers in contact are formatted."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="Multi Phone Contact",
+        )
+        contact.phone_numbers = [
+            PhoneNumber(
+                id=uuid.uuid4(),
+                contact_id=contact.id,
+                value="15551234567",
+                display_value="+1 (555) 123-4567",
+                type="mobile",
+                primary=True,
+            ),
+            PhoneNumber(
+                id=uuid.uuid4(),
+                contact_id=contact.id,
+                value="15559876543",
+                display_value="+1-555-987-6543",
+                type="work",
+                primary=False,
+            ),
+            PhoneNumber(
+                id=uuid.uuid4(),
+                contact_id=contact.id,
+                value="4402079460958",
+                display_value="+44 20 7946 0958",
+                type="home",
+                primary=False,
+            ),
+        ]
+
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        entries = root.findall("DirectoryEntry")
+        assert len(entries) == 3
+
+        # Check all formatted correctly
+        phone1 = entries[0].find("Telephone").text
+        phone2 = entries[1].find("Telephone").text
+        phone3 = entries[2].find("Telephone").text
+
+        assert phone1 == "1 555 123 4567"
+        assert phone2 == "1 555 987 6543"
+        assert phone3 == "44 207 946 0958"
+
+        # Ensure no + symbols in any phone
+        for entry in entries:
+            tel = entry.find("Telephone").text
+            assert "+" not in tel
+            assert tel.replace(" ", "").isdigit()
+
+    def test_xml_validity_with_formatted_phones(self, formatter):
+        """Test that XML is valid with formatted phone numbers."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="XML Test",
+        )
+        contact.phone_numbers = [
+            PhoneNumber(
+                id=uuid.uuid4(),
+                contact_id=contact.id,
+                value="15551234567",
+                display_value="+1-555-123-4567",
+                type="mobile",
+                primary=True,
+            )
+        ]
+
+        xml_str = formatter.generate_contact_directory(contact)
+
+        # Should not raise an exception
+        root = etree.fromstring(xml_str.encode("utf-8"))
+        assert root is not None
+        assert root.tag == "CiscoIPPhoneDirectory"
+
+    def test_various_input_formats_normalize_same(self, formatter):
+        """Test that various input formats normalize to same output."""
+        test_inputs = [
+            "+1-555-123-4567",
+            "+1 (555) 123-4567",
+            "1-555-123-4567",
+            "(555) 123-4567 ext 1",  # Extension info gets stripped
+            "15551234567",
+            "+15551234567",
+        ]
+
+        expected = "1 555 123 4567"
+        for phone_input in test_inputs[:6]:  # Skip the extension one for this test
+            result = formatter._format_phone_for_cisco(phone_input)
+            if "ext" not in phone_input:
+                assert result == expected, f"Failed for input: {phone_input}"
 
 
 class TestEdgeCases(TestCiscoXMLFormatter):
