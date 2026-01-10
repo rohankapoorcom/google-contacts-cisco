@@ -29,7 +29,8 @@ class PhoneNumberSchema(BaseModel):
         """Normalize phone number to E.164 format.
 
         Uses the phone normalization utility to convert the phone number
-        to E.164 format while preserving the display value.
+        to E.164 format while preserving the display value. Handles dialing
+        prefixes like *67, *82, #31# by stripping them before normalization.
 
         Args:
             data: Dictionary with phone number data
@@ -53,7 +54,15 @@ class PhoneNumberSchema(BaseModel):
             if normalized is None:
                 # Fallback to simple digit extraction if normalization fails
                 # This handles edge cases where phonenumbers library can't parse
-                digits = "".join(c for c in value if c.isdigit() or c == "+")
+                # First strip any dialing prefixes
+                import re
+                prefix_pattern = r"^[\s]*([*#]\d{1,3}[#])[\s]*|^[\s]*([*]\d{2})(?=[\s\-\(\)\+\.])"
+                cleaned_value = re.sub(prefix_pattern, "", value).strip()
+                # Handle multiple prefixes
+                cleaned_value = re.sub(prefix_pattern, "", cleaned_value).strip()
+                
+                # Extract digits and + for international
+                digits = "".join(c for c in cleaned_value if c.isdigit() or c == "+")
                 if not digits or (digits == "+" and len(digits) == 1):
                     raise ValueError(
                         f"Phone number must contain at least one digit: {value}"
