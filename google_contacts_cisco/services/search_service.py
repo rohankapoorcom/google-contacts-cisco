@@ -261,12 +261,20 @@ class SearchService:
             # Suffix match on last 7+ digits
             digits_only = ''.join(c for c in normalized if c.isdigit())
             if len(digits_only) >= 7:
-                conditions.append(PhoneNumber.value.like(f"%{digits_only[-7:]}"))
+                # Escape digits for LIKE pattern
+                escaped_digits = self._escape_like_pattern(digits_only[-7:])
+                conditions.append(
+                    PhoneNumber.value.like(f"%{escaped_digits}", escape="\\")
+                )
 
         # Fallback: digit-only suffix match
         digits = ''.join(c for c in phone_number if c.isdigit())
         if digits and len(digits) >= 7:
-            conditions.append(PhoneNumber.value.like(f"%{digits[-7:]}"))
+            # Escape digits for LIKE pattern
+            escaped_digits = self._escape_like_pattern(digits[-7:])
+            conditions.append(
+                PhoneNumber.value.like(f"%{escaped_digits}", escape="\\")
+            )
 
         if not conditions:
             logger.warning(
@@ -344,6 +352,24 @@ class SearchService:
         count = self.db.execute(stmt).scalar()
         return count or 0
 
+    def _escape_like_pattern(self, value: str) -> str:
+        """Escape special characters in LIKE patterns.
+
+        Escapes backslash, percent, and underscore to treat them as literals
+        rather than wildcards in SQL LIKE queries.
+
+        Args:
+            value: Value to escape
+
+        Returns:
+            Escaped value safe for LIKE patterns
+        """
+        return (
+            value.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+
     def _build_name_search_conditions(self, search_term: str) -> List:
         """Build search conditions for name fields.
 
@@ -354,11 +380,7 @@ class SearchService:
             List of SQLAlchemy conditions
         """
         # Escape LIKE wildcards to treat them as literals
-        escaped_term = (
-            search_term.replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
-        )
+        escaped_term = self._escape_like_pattern(search_term)
         # Case-insensitive pattern matching
         pattern = f"%{escaped_term}%"
         return [
@@ -385,19 +407,30 @@ class SearchService:
             # Exact match on normalized value
             conditions.append(PhoneNumber.value == normalized)
 
-            # Suffix matching on digits
+            # Suffix matching on digits - escape for LIKE pattern
             digits_only = ''.join(c for c in normalized if c.isdigit())
             if len(digits_only) >= 7:
-                suffix_pattern = f"%{digits_only[-7:]}"
-                conditions.append(PhoneNumber.value.like(suffix_pattern))
+                # Extract digits only, which are safe (no special chars)
+                # But still escape in case of future changes
+                escaped_digits = self._escape_like_pattern(digits_only[-7:])
+                suffix_pattern = f"%{escaped_digits}"
+                conditions.append(
+                    PhoneNumber.value.like(suffix_pattern, escape="\\")
+                )
 
         # Fallback: digit-only matching for partial numbers
         digits = ''.join(c for c in search_term if c.isdigit())
         if digits and len(digits) >= 4:
-            digit_pattern = f"%{digits}%"
-            conditions.append(PhoneNumber.value.like(digit_pattern))
+            # Escape digits for LIKE pattern safety
+            escaped_digits = self._escape_like_pattern(digits)
+            digit_pattern = f"%{escaped_digits}%"
+            conditions.append(
+                PhoneNumber.value.like(digit_pattern, escape="\\")
+            )
             # Also try display_value
-            conditions.append(PhoneNumber.display_value.like(digit_pattern))
+            conditions.append(
+                PhoneNumber.display_value.like(digit_pattern, escape="\\")
+            )
 
         return conditions
 

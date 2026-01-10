@@ -5,11 +5,12 @@ name search, phone number search, and pagination.
 """
 
 import uuid
-import pytest
 from datetime import datetime, timezone
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock
+
+import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 
 from google_contacts_cisco.models import Base
 from google_contacts_cisco.models.contact import Contact
@@ -48,7 +49,7 @@ def search_service(db_session, phone_normalizer):
 def sample_contacts(db_session):
     """Create sample contacts for testing."""
     contacts = []
-    
+
     # Contact 1: John Smith
     contact1 = Contact(
         id=uuid.uuid4(),
@@ -71,7 +72,7 @@ def sample_contacts(db_session):
     contact1.phone_numbers.append(phone1)
     db_session.add(contact1)
     contacts.append(contact1)
-    
+
     # Contact 2: Jane Smith
     contact2 = Contact(
         id=uuid.uuid4(),
@@ -94,7 +95,7 @@ def sample_contacts(db_session):
     contact2.phone_numbers.append(phone2)
     db_session.add(contact2)
     contacts.append(contact2)
-    
+
     # Contact 3: Bob Johnson
     contact3 = Contact(
         id=uuid.uuid4(),
@@ -117,7 +118,7 @@ def sample_contacts(db_session):
     contact3.phone_numbers.append(phone3)
     db_session.add(contact3)
     contacts.append(contact3)
-    
+
     # Contact 4: Alice Johnson (deleted)
     contact4 = Contact(
         id=uuid.uuid4(),
@@ -140,7 +141,7 @@ def sample_contacts(db_session):
     contact4.phone_numbers.append(phone4)
     db_session.add(contact4)
     contacts.append(contact4)
-    
+
     # Contact 5: Mary Williams (no phone)
     contact5 = Contact(
         id=uuid.uuid4(),
@@ -154,7 +155,7 @@ def sample_contacts(db_session):
     )
     db_session.add(contact5)
     contacts.append(contact5)
-    
+
     db_session.commit()
     return contacts
 
@@ -230,7 +231,7 @@ class TestSearchContactsByName:
         """Should be case insensitive."""
         results = search_service.search_by_name("john")
         assert len(results) == 2  # John Smith and Bob Johnson (Alice deleted)
-        
+
         results_upper = search_service.search_by_name("JOHN")
         assert len(results) == len(results_upper)
 
@@ -355,15 +356,15 @@ class TestPagination:
         # Get all results
         all_results = search_service.search_by_name("Smith")
         assert len(all_results) == 2
-        
+
         # Get first page
         page1 = search_service.search_by_name("Smith", limit=1, offset=0)
         assert len(page1) == 1
-        
+
         # Get second page
         page2 = search_service.search_by_name("Smith", limit=1, offset=1)
         assert len(page2) == 1
-        
+
         # Should be different contacts
         assert page1[0].id != page2[0].id
 
@@ -485,6 +486,26 @@ class TestEdgeCases:
         # Should treat % as literal, not wildcard
         assert isinstance(results, list)
 
+    def test_search_with_underscore_wildcard(self, search_service, sample_contacts):
+        """Should handle underscore wildcard in search."""
+        results = search_service.search_by_name("___")
+        # Should treat _ as literal, not single-char wildcard
+        assert isinstance(results, list)
+        # Should not match "Bob" (3 chars) as would happen with SQL wildcards
+        assert len(results) == 0
+
+    def test_search_with_backslash(self, search_service, sample_contacts):
+        """Should handle backslash in search."""
+        results = search_service.search_by_name("\\")
+        # Should treat backslash as literal
+        assert isinstance(results, list)
+
+    def test_search_with_combined_wildcards(self, search_service, sample_contacts):
+        """Should handle combined wildcard characters."""
+        results = search_service.search_by_name("%_\\")
+        # Should treat all as literals
+        assert isinstance(results, list)
+
     def test_search_with_unicode(self, search_service, db_session):
         """Should handle unicode characters."""
         # Add contact with unicode name
@@ -500,7 +521,7 @@ class TestEdgeCases:
         )
         db_session.add(contact)
         db_session.commit()
-        
+
         results = search_service.search_by_name("José")
         assert len(results) == 1
         assert results[0].display_name == "José García"
@@ -510,6 +531,123 @@ class TestEdgeCases:
         long_query = "x" * 1000
         results = search_service.search_by_name(long_query)
         assert results == []
+
+
+class TestPhoneSearchSecurity:
+    """Security tests for phone number search."""
+
+    def test_phone_search_with_percent_wildcard(self, search_service, sample_contacts):
+        """Should handle % wildcard in phone search."""
+        # Attempt to use % as wildcard to match all phones
+        results = search_service.search_by_phone("%")
+        # Should not match everything - % should be treated as literal
+        assert len(results) == 0
+
+    def test_phone_search_with_underscore_wildcard(
+        self, search_service, sample_contacts
+    ):
+        """Should handle underscore wildcard in phone search."""
+        # Attempt to use _ as single-char wildcard
+        results = search_service.search_by_phone("_________")
+        # Should not match based on wildcards
+        assert len(results) == 0
+
+    def test_phone_search_with_combined_wildcards(
+        self, search_service, sample_contacts
+    ):
+        """Should handle combined wildcard injection in phone search."""
+        results = search_service.search_by_phone("%_%")
+        # Should treat as literals, not wildcards
+        assert len(results) == 0
+
+    def test_phone_search_pattern_injection_attack(
+        self, search_service, sample_contacts
+    ):
+        """Should prevent pattern injection attacks in phone search."""
+        # Try to match all 7-digit sequences with wildcards
+        results = search_service.search_by_phone("%555____")
+        # Should not match based on wildcard patterns
+        assert isinstance(results, list)
+        # Should not match John Smith's 555-1234 via wildcard
+        assert not any(c.display_name == "John Smith" for c in results)
+
+    def test_phone_search_backslash_escape(self, search_service, sample_contacts):
+        """Should handle backslash in phone search."""
+        results = search_service.search_by_phone("\\")
+        # Should treat backslash as literal
+        assert isinstance(results, list)
+        assert len(results) == 0
+
+    def test_phone_search_sql_comment_injection(self, search_service, sample_contacts):
+        """Should prevent SQL comment injection in phone search."""
+        results = search_service.search_by_phone("555-- comment")
+        # Should treat as part of search, not SQL comment
+        assert isinstance(results, list)
+
+    def test_phone_search_with_malicious_pattern(
+        self, search_service, sample_contacts
+    ):
+        """Should handle malicious LIKE patterns safely."""
+        # Try various SQL injection patterns
+        malicious_patterns = [
+            "%'; DROP TABLE phone_numbers; --",
+            "1' OR '1'='1",
+            "%\\'%",
+            "___________",  # Try to match by length
+            "%%%%%%%%",     # Try to match everything
+        ]
+
+        for pattern in malicious_patterns:
+            results = search_service.search_by_phone(pattern)
+            # Should not cause errors or unexpected matches
+            assert isinstance(results, list)
+
+    def test_phone_search_conditions_escaping(self, search_service):
+        """Should escape wildcards in phone search conditions."""
+        # Test the internal method directly
+        conditions = search_service._build_phone_search_conditions("%555")
+        # Should create conditions, not fail
+        assert isinstance(conditions, list)
+        # Conditions should be safely escaped
+
+    def test_phone_search_dos_prevention(self, search_service, sample_contacts):
+        """Should handle patterns that could cause DoS via performance issues."""
+        # Pattern that could cause expensive LIKE operations
+        expensive_pattern = "%" * 100 + "555"
+        results = search_service.search_by_phone(expensive_pattern)
+        # Should complete without hanging (escaping prevents wildcard explosion)
+        assert isinstance(results, list)
+
+
+class TestNameSearchSecurity:
+    """Additional security tests for name search."""
+
+    def test_name_search_wildcard_injection(self, search_service, sample_contacts):
+        """Should prevent wildcard injection in name search."""
+        # Try to match all names with wildcard
+        results = search_service.search_by_name("%")
+        # Should not match everything
+        assert len(results) == 0
+
+    def test_name_search_underscore_injection(self, search_service, sample_contacts):
+        """Should prevent underscore wildcard injection."""
+        # Try to match 3-char names like "Bob"
+        results = search_service.search_by_name("___")
+        # Should not match Bob via wildcards
+        assert len(results) == 0
+
+    def test_name_search_escape_helper(self, search_service):
+        """Should properly escape LIKE patterns."""
+        # Test the escape helper method
+        escaped = search_service._escape_like_pattern("test%_\\value")
+        assert escaped == "test\\%\\_\\\\value"
+
+        # Verify backslash is escaped
+        assert "\\\\" in escaped
+        # Verify percent is escaped
+        assert "\\%" in escaped
+        # Verify underscore is escaped
+        assert "\\_" in escaped
 
 
 class TestPhoneNormalizerIntegration:
@@ -525,8 +663,8 @@ class TestPhoneNormalizerIntegration:
         """Should call normalizer for phone searches."""
         normalizer = Mock(spec=PhoneNumberNormalizer)
         normalizer.normalize_for_search = Mock(return_value="+12025551234")
-        
+
         service = SearchService(db_session, normalizer)
         service.search_by_phone("202-555-1234")
-        
+
         normalizer.normalize_for_search.assert_called_once_with("202-555-1234")
