@@ -59,7 +59,8 @@ class SyncScheduler:
         """Run scheduler loop.
 
         Continuously runs until stopped, waiting for the configured
-        interval between sync operations.
+        interval between sync operations. Runs an initial sync immediately
+        on startup before waiting for the first interval.
         """
         logger.info(
             "Sync scheduler started (every %d minutes)",
@@ -68,6 +69,10 @@ class SyncScheduler:
 
         # Convert minutes to seconds for sleep
         interval_seconds = self.interval_minutes * 60
+
+        # Run initial sync immediately on startup
+        if self.running:
+            self._run_sync()
 
         while self.running:
             # Wait for the interval or until stopped

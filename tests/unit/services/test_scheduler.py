@@ -226,37 +226,44 @@ class TestSchedulerIntegration:
     def test_scheduler_runs_sync_periodically(
         self, mock_get_sync_service, mock_session_local
     ):
-        """Test scheduler runs sync at configured intervals."""
+        """Test scheduler runs sync immediately on startup and then at configured intervals."""
         # This test uses a very short interval for testing
         # In real usage, intervals should be at least 5 minutes
 
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
 
-        # Use a threading Event to signal when sync has been called
+        # Track how many times sync was called
+        sync_call_count = [0]
         sync_called_event = threading.Event()
 
-        def safe_auto_sync_with_signal():
-            sync_called_event.set()
+        def safe_auto_sync_with_counter():
+            sync_call_count[0] += 1
+            if sync_call_count[0] == 1:
+                # Signal after first sync (immediate startup sync)
+                sync_called_event.set()
             return {"status": "success"}
 
         mock_sync_service = MagicMock()
-        mock_sync_service.safe_auto_sync.side_effect = safe_auto_sync_with_signal
+        mock_sync_service.safe_auto_sync.side_effect = safe_auto_sync_with_counter
         mock_get_sync_service.return_value = mock_sync_service
 
         # Create scheduler with very short interval for testing
         scheduler = SyncScheduler(interval_minutes=1)
         scheduler._stop_event = threading.Event()
 
-        # Override interval for testing (0 means immediate execution)
+        # Override interval for testing (0 means immediate execution after initial sync)
         scheduler.interval_minutes = 0
 
         scheduler.start()
 
         try:
-            # Wait for sync to be called with a reasonable timeout
+            # Wait for initial sync to be called with a reasonable timeout
             sync_called = sync_called_event.wait(timeout=2.0)
-            assert sync_called, "Scheduler did not call sync within timeout"
+            assert sync_called, "Scheduler did not call initial sync within timeout"
+            
+            # Verify initial sync was called
+            assert sync_call_count[0] >= 1, "Initial sync should have been called immediately"
         finally:
             scheduler.stop()
 
