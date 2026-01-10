@@ -187,11 +187,13 @@ app.add_middleware(
 )
 
 # Include API routers
+# Note: search_router must be included before contacts_router to ensure
+# /api/contacts/search routes are matched before /api/contacts/{contact_id}
 app.include_router(auth_router)
+app.include_router(search_router)  # More specific routes first
 app.include_router(contacts_router)
 app.include_router(directory_router)
 app.include_router(google_router)
-app.include_router(search_router)
 app.include_router(sync_router)
 
 
