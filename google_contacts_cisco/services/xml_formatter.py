@@ -4,6 +4,7 @@ This module provides functionality to generate Cisco IP Phone XML format
 for directory menus, contact lists, and help screens.
 """
 
+import re
 from typing import TYPE_CHECKING, List
 
 from lxml import etree
@@ -15,6 +16,24 @@ if TYPE_CHECKING:
     from ..models.contact import Contact
 
 logger = get_logger(__name__)
+
+
+# Security: Maximum lengths for XML fields to prevent DoS attacks
+MAX_DISPLAY_NAME_LENGTH = 200
+MAX_PHONE_LABEL_LENGTH = 50
+MAX_PHONE_VALUE_LENGTH = 50
+
+# Security: Patterns for detecting potentially malicious content
+DANGEROUS_PATTERNS = [
+    r'<script[^>]*>.*?</script>',  # Script tags
+    r'javascript:',  # JavaScript URLs
+    r'on\w+\s*=',  # Event handlers (onclick, onerror, etc.)
+    r'<iframe[^>]*>',  # iFrame tags
+    r'&[#\w]+;(?!amp;|lt;|gt;|quot;|apos;)',  # Suspicious entities (excluding standard)
+]
+
+# Compile patterns for efficiency
+DANGEROUS_PATTERN_REGEX = re.compile('|'.join(DANGEROUS_PATTERNS), re.IGNORECASE)
 
 
 # Group mapping for phone keypad
@@ -34,6 +53,59 @@ GROUP_MAPPINGS = {
 
 # All characters that are explicitly mapped to a group
 MAPPED_CHARS = {char for chars in GROUP_MAPPINGS.values() for char in chars}
+
+
+def sanitize_text_content(text: str, max_length: int = MAX_DISPLAY_NAME_LENGTH) -> str:
+    """Sanitize text content for XML output.
+
+    This function provides defense-in-depth security:
+    1. Validates and filters potentially malicious content
+    2. Enforces maximum length limits to prevent DoS
+    3. Strips control characters that could break XML structure
+    4. Works in conjunction with lxml's automatic XML escaping
+
+    Args:
+        text: Input text to sanitize
+        max_length: Maximum allowed length
+
+    Returns:
+        Sanitized text safe for XML output
+
+    Raises:
+        ValueError: If text contains dangerous patterns
+    """
+    if not text:
+        return ""
+
+    # Step 1: Check for dangerous patterns
+    if DANGEROUS_PATTERN_REGEX.search(text):
+        logger.warning(
+            "Potentially malicious content detected in text: %s",
+            text[:50] + "..." if len(text) > 50 else text,
+        )
+        raise ValueError("Text contains potentially malicious content")
+
+    # Step 2: Strip control characters (except newlines, tabs, carriage returns)
+    # Control characters could break XML structure or phone display
+    sanitized = "".join(
+        char
+        for char in text
+        if char in ("\n", "\r", "\t") or (ord(char) >= 32 and ord(char) != 127)
+    )
+
+    # Step 3: Enforce maximum length
+    if len(sanitized) > max_length:
+        logger.info(
+            "Truncating text from %d to %d characters", len(sanitized), max_length
+        )
+        sanitized = sanitized[:max_length]
+
+    # Step 4: Additional validation - ensure no CDATA escape sequences
+    if "]]>" in sanitized:
+        logger.warning("CDATA escape sequence detected, removing")
+        sanitized = sanitized.replace("]]>", "]]&gt;")
+
+    return sanitized
 
 
 class CiscoXMLFormatter:
@@ -107,11 +179,24 @@ class CiscoXMLFormatter:
         if contacts:
             # Add menu items for each contact
             for contact in contacts:
-                item = etree.SubElement(root, "MenuItem")
+                try:
+                    # Sanitize user-controlled content before XML generation
+                    # lxml handles XML escaping automatically when setting .text
+                    sanitized_name = sanitize_text_content(
+                        contact.display_name or "", MAX_DISPLAY_NAME_LENGTH
+                    )
+                except ValueError as e:
+                    logger.error(
+                        "Skipping contact %s due to sanitization error: %s",
+                        contact.id,
+                        e,
+                    )
+                    # Skip contacts with malicious content
+                    continue
 
+                item = etree.SubElement(root, "MenuItem")
                 name = etree.SubElement(item, "Name")
-                # lxml handles XML escaping automatically when setting .text
-                name.text = contact.display_name or ""
+                name.text = sanitized_name
 
                 url = etree.SubElement(item, "URL")
                 url.text = f"{self.base_url}/directory/contacts/{contact.id}"
@@ -140,12 +225,19 @@ class CiscoXMLFormatter:
 
         Returns:
             XML string for contact directory
+
+        Raises:
+            ValueError: If contact display name contains malicious content
         """
         root = etree.Element("CiscoIPPhoneDirectory")
 
-        # Title - lxml handles XML escaping automatically when setting .text
+        # Title - sanitize user-controlled content before XML generation
+        # lxml handles XML escaping automatically when setting .text
         title = etree.SubElement(root, "Title")
-        title.text = contact.display_name or ""
+        sanitized_display_name = sanitize_text_content(
+            contact.display_name or "", MAX_DISPLAY_NAME_LENGTH
+        )
+        title.text = sanitized_display_name
 
         # Add phone numbers
         phone_numbers = getattr(contact, "phone_numbers", None) or []
@@ -160,10 +252,18 @@ class CiscoXMLFormatter:
                 phone_label = phone.type.capitalize() if phone.type else "Phone"
                 if phone.primary:
                     phone_label += " (Primary)"
-                name.text = phone_label
+                # Sanitize phone label (should be safe but defense-in-depth)
+                sanitized_label = sanitize_text_content(
+                    phone_label, MAX_PHONE_LABEL_LENGTH
+                )
+                name.text = sanitized_label
 
                 telephone = etree.SubElement(entry, "Telephone")
-                telephone.text = phone.display_value
+                # Sanitize phone display value
+                sanitized_phone = sanitize_text_content(
+                    phone.display_value, MAX_PHONE_VALUE_LENGTH
+                )
+                telephone.text = sanitized_phone
         else:
             # No phone numbers
             entry = etree.SubElement(root, "DirectoryEntry")
