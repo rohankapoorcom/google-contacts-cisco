@@ -21,6 +21,18 @@ A comprehensive web application that synchronizes Google Contacts and serves the
 - Python 3.10+
 - Google Cloud Project with People API enabled
 - OAuth 2.0 credentials
+- 2GB RAM minimum (see [Memory Requirements](#memory-requirements))
+
+### Memory Requirements
+
+The application manages memory efficiently during synchronization:
+
+- **Small Lists (< 1K contacts)**: 512MB minimum
+- **Medium Lists (1K-5K contacts)**: 1-2GB recommended  
+- **Large Lists (5K-10K contacts)**: 2-4GB recommended
+- **Very Large Lists (10K+ contacts)**: 4GB+ recommended
+
+The sync service automatically clears SQLAlchemy's session cache after each batch to prevent memory leaks. Optional memory monitoring is available with `psutil` installed.
 
 ### Installation
 

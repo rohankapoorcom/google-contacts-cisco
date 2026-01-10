@@ -4,6 +4,7 @@ This module provides the SyncService class which handles full and incremental
 synchronization of contacts from Google to the local database.
 """
 
+import gc
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -30,6 +31,29 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Try to import psutil for memory monitoring (optional dependency)
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+
+
+def get_memory_usage_mb() -> Optional[float]:
+    """Get current process memory usage in MB.
+    
+    Returns:
+        Memory usage in MB if psutil is available, None otherwise
+    """
+    if HAS_PSUTIL:
+        try:
+            process = psutil.Process()
+            return process.memory_info().rss / 1024 / 1024
+        except Exception as e:
+            logger.debug("Failed to get memory usage: %s", e)
+            return None
+    return None
+
 # Module-level lock for preventing concurrent syncs
 _sync_lock = Lock()
 
@@ -53,6 +77,8 @@ class SyncStatistics:
         default_factory=lambda: datetime.now(timezone.utc)
     )
     end_time: Optional[datetime] = None
+    peak_memory_mb: Optional[float] = None
+    start_memory_mb: Optional[float] = None
 
     def to_dict(self) -> dict:
         """Convert statistics to dictionary.
@@ -60,7 +86,7 @@ class SyncStatistics:
         Returns:
             Dictionary representation of sync statistics
         """
-        return {
+        result = {
             "total_fetched": self.total_fetched,
             "created": self.created,
             "updated": self.updated,
@@ -70,6 +96,15 @@ class SyncStatistics:
             "sync_type": self.sync_type,
             "duration_seconds": self.duration_seconds,
         }
+        if self.peak_memory_mb is not None:
+            result["peak_memory_mb"] = round(self.peak_memory_mb, 2)
+        if self.start_memory_mb is not None:
+            result["start_memory_mb"] = round(self.start_memory_mb, 2)
+        if self.peak_memory_mb is not None and self.start_memory_mb is not None:
+            result["memory_delta_mb"] = round(
+                self.peak_memory_mb - self.start_memory_mb, 2
+            )
+        return result
 
     @property
     def duration_seconds(self) -> float:
@@ -151,10 +186,16 @@ class SyncService:
         """
         logger.info("Starting full sync")
         stats = SyncStatistics()
+        stats.start_memory_mb = get_memory_usage_mb()
+        
+        if stats.start_memory_mb:
+            logger.info("Sync starting with memory usage: %.2f MB", stats.start_memory_mb)
 
         # Create sync state record
         sync_state = self.sync_repo.create_sync_state(status=SyncStatus.SYNCING)
         self.db.commit()
+        # Keep sync_state ID to re-fetch it after expunge operations
+        sync_state_id = sync_state.id
 
         try:
             # Fetch all contacts from Google
@@ -180,9 +221,19 @@ class SyncService:
                 self._process_contacts_page(
                     response.connections, stats, batch_size
                 )
+                
+                # Track peak memory usage
+                current_memory = get_memory_usage_mb()
+                if current_memory and (
+                    stats.peak_memory_mb is None or current_memory > stats.peak_memory_mb
+                ):
+                    stats.peak_memory_mb = current_memory
+                    logger.debug("Memory usage: %.2f MB", current_memory)
 
                 # Store sync token if this is the last page
                 if not response.next_page_token and response.next_sync_token:
+                    # Re-fetch sync_state if it was detached by expunge_all
+                    sync_state = self.db.get(SyncState, sync_state_id)
                     self.sync_repo.update_sync_state(
                         sync_state,
                         sync_token=response.next_sync_token,
@@ -199,15 +250,30 @@ class SyncService:
 
             # Mark sync as complete
             stats.end_time = datetime.now(timezone.utc)
+            # Re-fetch sync_state if it was detached
+            sync_state = self.db.get(SyncState, sync_state_id)
             self.sync_repo.update_sync_state(sync_state, status=SyncStatus.IDLE)
             self.db.commit()
-
-            logger.info("Full sync completed: %s", stats.to_dict())
+            
+            # Final memory check
+            final_memory = get_memory_usage_mb()
+            if final_memory and stats.start_memory_mb:
+                memory_delta = final_memory - stats.start_memory_mb
+                logger.info(
+                    "Full sync completed: %s (memory delta: %.2f MB)",
+                    stats.to_dict(),
+                    memory_delta
+                )
+            else:
+                logger.info("Full sync completed: %s", stats.to_dict())
+            
             return stats
 
         except Exception as e:
             logger.exception("Full sync failed")
             stats.end_time = datetime.now(timezone.utc)
+            # Re-fetch sync_state if it was detached
+            sync_state = self.db.get(SyncState, sync_state_id)
             self.sync_repo.update_sync_state(
                 sync_state,
                 status=SyncStatus.ERROR,
@@ -259,11 +325,14 @@ class SyncService:
 
                 stats.total_fetched += 1
 
-                # Commit in batches for performance
+                # Commit in batches for performance and memory management
                 if stats.total_fetched % batch_size == 0:
                     self.db.commit()
+                    # Clear SQLAlchemy identity map to prevent memory buildup
+                    # This removes all objects from the session that aren't dirty
+                    self.db.expunge_all()
                     logger.debug(
-                        "Committed batch: %d contacts processed",
+                        "Committed batch: %d contacts processed (memory cleared)",
                         stats.total_fetched,
                     )
 
@@ -278,6 +347,8 @@ class SyncService:
 
         # Commit remaining contacts in page
         self.db.commit()
+        # Clear identity map after final commit for the page
+        self.db.expunge_all()
 
     def get_sync_status(self) -> dict:
         """Get current sync status.
@@ -371,12 +442,18 @@ class SyncService:
         logger.info("Using sync token: %s...", sync_token[:20])
 
         stats = SyncStatistics(sync_type="incremental")
+        stats.start_memory_mb = get_memory_usage_mb()
+        
+        if stats.start_memory_mb:
+            logger.info("Sync starting with memory usage: %.2f MB", stats.start_memory_mb)
 
         # Create new sync state record
         new_sync_state = self.sync_repo.create_sync_state(
             status=SyncStatus.SYNCING
         )
         self.db.commit()
+        # Keep sync_state ID to re-fetch it after expunge operations
+        sync_state_id = new_sync_state.id
 
         try:
             # Fetch changes from Google using sync token
@@ -402,9 +479,19 @@ class SyncService:
                     self._process_contacts_page(
                         response.connections, stats, batch_size
                     )
+                
+                # Track peak memory usage
+                current_memory = get_memory_usage_mb()
+                if current_memory and (
+                    stats.peak_memory_mb is None or current_memory > stats.peak_memory_mb
+                ):
+                    stats.peak_memory_mb = current_memory
+                    logger.debug("Memory usage: %.2f MB", current_memory)
 
                 # Store new sync token if this is the last page
                 if not response.next_page_token and response.next_sync_token:
+                    # Re-fetch sync_state if it was detached by expunge_all
+                    new_sync_state = self.db.get(SyncState, sync_state_id)
                     self.sync_repo.update_sync_state(
                         new_sync_state,
                         sync_token=response.next_sync_token,
@@ -421,12 +508,25 @@ class SyncService:
 
             # Mark sync as complete
             stats.end_time = datetime.now(timezone.utc)
+            # Re-fetch sync_state if it was detached
+            new_sync_state = self.db.get(SyncState, sync_state_id)
             self.sync_repo.update_sync_state(
                 new_sync_state, status=SyncStatus.IDLE
             )
             self.db.commit()
+            
+            # Final memory check
+            final_memory = get_memory_usage_mb()
+            if final_memory and stats.start_memory_mb:
+                memory_delta = final_memory - stats.start_memory_mb
+                logger.info(
+                    "Incremental sync completed: %s (memory delta: %.2f MB)",
+                    stats.to_dict(),
+                    memory_delta
+                )
+            else:
+                logger.info("Incremental sync completed: %s", stats.to_dict())
 
-            logger.info("Incremental sync completed: %s", stats.to_dict())
             return stats
 
         except SyncTokenExpiredError:
@@ -434,6 +534,8 @@ class SyncService:
             logger.warning(
                 "Sync token expired (410), falling back to full sync"
             )
+            # Re-fetch sync_state if it was detached
+            new_sync_state = self.db.get(SyncState, sync_state_id)
             self.sync_repo.update_sync_state(
                 new_sync_state,
                 status=SyncStatus.ERROR,
@@ -445,6 +547,8 @@ class SyncService:
         except Exception as e:
             logger.exception("Incremental sync failed")
             stats.end_time = datetime.now(timezone.utc)
+            # Re-fetch sync_state if it was detached
+            new_sync_state = self.db.get(SyncState, sync_state_id)
             self.sync_repo.update_sync_state(
                 new_sync_state,
                 status=SyncStatus.ERROR,
