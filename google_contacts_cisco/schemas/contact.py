@@ -5,10 +5,13 @@ separate from the Google API-specific schemas.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, model_validator
+
+if TYPE_CHECKING:
+    from ..models.contact import Contact
 
 from ..config import get_settings
 from ..utils.datetime_utils import format_timestamp_for_display
@@ -185,7 +188,7 @@ class ContactResponse(BaseModel):
     created_at: Optional[str] = None
 
     @classmethod
-    def from_orm(cls, contact):
+    def from_orm(cls, contact: "Contact") -> "ContactResponse":
         """Create response from ORM model with timezone-aware timestamps.
 
         Timestamps are formatted using the configured timezone from
@@ -202,20 +205,20 @@ class ContactResponse(BaseModel):
 
         return cls(
             id=str(contact.id),
-            display_name=contact.display_name,
-            given_name=contact.given_name,
-            family_name=contact.family_name,
+            display_name=contact.display_name,  # type: ignore[arg-type]
+            given_name=contact.given_name,  # type: ignore[arg-type]
+            family_name=contact.family_name,  # type: ignore[arg-type]
             phone_numbers=[
                 PhoneNumberResponse.model_validate(p) for p in contact.phone_numbers
             ],
             email_addresses=email_addresses,
             updated_at=(
-                format_timestamp_for_display(contact.updated_at, settings.timezone)
+                format_timestamp_for_display(contact.updated_at, settings.timezone)  # type: ignore[arg-type]
                 if contact.updated_at
                 else None
             ),
             created_at=(
-                format_timestamp_for_display(contact.created_at, settings.timezone)
+                format_timestamp_for_display(contact.created_at, settings.timezone)  # type: ignore[arg-type]
                 if contact.created_at
                 else None
             ),
