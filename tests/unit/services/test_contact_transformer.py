@@ -3,20 +3,19 @@
 This module tests the contact transformation service that converts
 Google Person data to internal contact format.
 """
-import pytest
 
 from google_contacts_cisco.api.schemas import (
-    GooglePerson,
-    GoogleName,
-    GooglePhoneNumber,
-    GoogleOrganization,
     GoogleMetadata,
     GoogleMetadataSource,
+    GoogleName,
+    GoogleOrganization,
+    GooglePerson,
+    GooglePhoneNumber,
 )
 from google_contacts_cisco.services.contact_transformer import (
+    _transform_phone_numbers,
     transform_google_person_to_contact,
     transform_google_persons_batch,
-    _transform_phone_numbers,
 )
 
 
@@ -189,6 +188,38 @@ class TestTransformGooglePersonToContact:
 
         assert contact.organization is None
         assert contact.job_title == "Engineer"
+
+    def test_transform_business_contact_without_names(self):
+        """Test transforming business contact with no personal names."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="Acme Corporation", title="Sales")],
+            phoneNumbers=[GooglePhoneNumber(value="5551234567", type="work")],
+        )
+
+        contact = transform_google_person_to_contact(person)
+
+        # Display name should use organization name
+        assert contact.display_name == "Acme Corporation"
+        assert contact.given_name is None
+        assert contact.family_name is None
+        assert contact.organization == "Acme Corporation"
+        assert contact.job_title == "Sales"
+        assert len(contact.phone_numbers) == 1
+
+    def test_transform_business_contact_uses_organization_before_email(self):
+        """Test business contact uses organization name before email."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="Tech Solutions Inc")],
+            emailAddresses=[{"value": "info@techsolutions.com"}],
+        )
+
+        contact = transform_google_person_to_contact(person)
+
+        # Should prefer organization name over email
+        assert contact.display_name == "Tech Solutions Inc"
+        assert contact.organization == "Tech Solutions Inc"
 
 
 class TestTransformPhoneNumbers:
