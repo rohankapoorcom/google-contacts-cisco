@@ -38,6 +38,9 @@ def get_logger(name: str) -> logging.Logger:
 
         logger.addHandler(handler)
 
+        # Prevent propagation to root logger to avoid duplicate log entries
+        logger.propagate = False
+
     return logger
 
 
