@@ -419,10 +419,10 @@ class TestContactDirectoryEndpoint:
         entries = root.findall("DirectoryEntry")
         assert len(entries) == 2  # Two phone numbers
 
-        # Verify phone values are present
+        # Verify phone values are present (formatted for Cisco)
         telephones = [entry.find("Telephone").text for entry in entries]
-        assert "(555) 123-4567" in telephones
-        assert "(555) 987-6543" in telephones
+        assert "555 123 4567" in telephones
+        assert "555 987 6543" in telephones
 
     def test_contact_directory_primary_phone_first(self, client, test_contact):
         """Test contact directory shows primary phone first."""
@@ -866,7 +866,7 @@ class TestContactsWithoutPhoneNumbersFiltered:
 
     def test_contact_detail_still_shows_no_phone_message(self, client, db_session):
         """Test individual contact view still handles contacts without phones.
-        
+
         This ensures backward compatibility - if someone directly accesses
         a contact without phones, they still get appropriate messaging.
         """

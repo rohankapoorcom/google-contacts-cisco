@@ -286,3 +286,196 @@ class TestXMLDirectoryPerformance:
         
         assert response.status_code == status.HTTP_200_OK
         assert duration < 1.0  # Should search and generate XML quickly
+
+
+@pytest.mark.integration
+class TestDirectoryPhoneNumberFormatting:
+    """Integration tests for phone number formatting in directory endpoints."""
+
+    def test_directory_contact_phone_formatting(
+        self, integration_client, integration_db
+    ):
+        """Test that phone numbers in directory are formatted without + prefix."""
+        from google_contacts_cisco.models import Contact, PhoneNumber
+
+        # Create contact with phone in +1 format
+        contact = Contact(
+            resource_name="people/format_test",
+            display_name="Format Test Contact",
+        )
+        integration_db.add(contact)
+        integration_db.flush()
+
+        phone = PhoneNumber(
+            contact_id=contact.id,
+            value="15551234567",
+            display_value="+1-555-123-4567",
+            type="mobile",
+            primary=True,
+        )
+        integration_db.add(phone)
+        integration_db.commit()
+
+        # Get contact directory
+        response = integration_client.get(f"/directory/contacts/{contact.id}")
+
+        assert response.status_code == status.HTTP_200_OK
+        root = etree.fromstring(response.content)
+
+        # Find telephone element
+        entries = root.findall("DirectoryEntry")
+        assert len(entries) > 0
+
+        telephone = entries[0].find("Telephone").text
+        # Should be formatted without + and with spaces
+        assert telephone == "1 555 123 4567"
+        assert "+" not in telephone
+        assert "-" not in telephone
+
+    def test_multiple_phones_all_formatted_consistently(
+        self, integration_client, integration_db
+    ):
+        """Test that multiple phone numbers are all formatted consistently."""
+        from google_contacts_cisco.models import Contact, PhoneNumber
+
+        contact = Contact(
+            resource_name="people/multi_format",
+            display_name="Multi Format Test",
+        )
+        integration_db.add(contact)
+        integration_db.flush()
+
+        # Add phones with different input formats
+        phones = [
+            PhoneNumber(
+                contact_id=contact.id,
+                value="15551234567",
+                display_value="+1 (555) 123-4567",
+                type="mobile",
+                primary=True,
+            ),
+            PhoneNumber(
+                contact_id=contact.id,
+                value="15559876543",
+                display_value="+1-555-987-6543",
+                type="work",
+                primary=False,
+            ),
+            PhoneNumber(
+                contact_id=contact.id,
+                value="4402079460958",
+                display_value="+44 20 7946 0958",
+                type="home",
+                primary=False,
+            ),
+        ]
+
+        for phone in phones:
+            integration_db.add(phone)
+
+        integration_db.commit()
+
+        # Get contact directory
+        response = integration_client.get(f"/directory/contacts/{contact.id}")
+
+        assert response.status_code == status.HTTP_200_OK
+        root = etree.fromstring(response.content)
+
+        entries = root.findall("DirectoryEntry")
+        assert len(entries) == 3
+
+        # Verify all formatted correctly
+        tel1 = entries[0].find("Telephone").text
+        tel2 = entries[1].find("Telephone").text
+        tel3 = entries[2].find("Telephone").text
+
+        assert tel1 == "1 555 123 4567"
+        assert tel2 == "1 555 987 6543"
+        assert tel3 == "44 207 946 0958"
+
+        # Verify no + symbols in any phone
+        for entry in entries:
+            tel = entry.find("Telephone").text
+            assert "+" not in tel
+            assert tel.replace(" ", "").isdigit()
+
+    def test_various_input_formats_normalize_correctly(
+        self, integration_client, integration_db
+    ):
+        """Test that various input formats all normalize correctly."""
+        from google_contacts_cisco.models import Contact, PhoneNumber
+
+        test_cases = [
+            ("+1-555-123-4567", "1 555 123 4567"),
+            ("(555) 123-4567", "555 123 4567"),
+            ("555.123.4567", "555 123 4567"),
+            ("+15551234567", "1 555 123 4567"),
+        ]
+
+        for idx, (input_format, expected_output) in enumerate(test_cases):
+            contact = Contact(
+                resource_name=f"people/format_test_{idx}",
+                display_name=f"Format Test {idx}",
+            )
+            integration_db.add(contact)
+            integration_db.flush()
+
+            digits = "".join(c for c in input_format if c.isdigit())
+            phone = PhoneNumber(
+                contact_id=contact.id,
+                value=digits,
+                display_value=input_format,
+                type="mobile",
+                primary=True,
+            )
+            integration_db.add(phone)
+            integration_db.commit()
+
+            # Get contact directory
+            response = integration_client.get(f"/directory/contacts/{contact.id}")
+
+            assert response.status_code == status.HTTP_200_OK
+            root = etree.fromstring(response.content)
+
+            entries = root.findall("DirectoryEntry")
+            telephone = entries[0].find("Telephone").text
+
+            assert (
+                telephone == expected_output
+            ), f"Input '{input_format}' should format to '{expected_output}' but got '{telephone}'"
+
+    def test_rest_api_preserves_original_format(
+        self, integration_client, integration_db
+    ):
+        """Test that REST API endpoints preserve original display_value with +."""
+        from google_contacts_cisco.models import Contact, PhoneNumber
+
+        contact = Contact(
+            resource_name="people/rest_format",
+            display_name="REST Format Test",
+        )
+        integration_db.add(contact)
+        integration_db.flush()
+
+        original_display = "+1-555-123-4567"
+        phone = PhoneNumber(
+            contact_id=contact.id,
+            value="15551234567",
+            display_value=original_display,
+            type="mobile",
+            primary=True,
+        )
+        integration_db.add(phone)
+        integration_db.commit()
+
+        # Get via REST API (not directory endpoint)
+        response = integration_client.get(f"/api/contacts/{contact.id}")
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+
+        # REST API should preserve original format
+        phone_data = data["phone_numbers"][0]
+        assert phone_data["display_value"] == original_display
+        assert "+" in phone_data["display_value"]
+
