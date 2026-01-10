@@ -343,5 +343,5 @@ class TestSyncMemoryManagement:
         total = db_session.query(Contact).count()
         assert total == 500  # 100 existing + 400 new
 
-        active = db_session.query(Contact).filter(Contact.deleted == False).count()
+        active = db_session.query(Contact).filter(~Contact.deleted).count()
         assert active == 450  # 500 - 50 deleted
