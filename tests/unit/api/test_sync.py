@@ -131,16 +131,23 @@ class TestFullSyncEndpoint:
         self, mock_get_service, mock_auth, client
     ):
         """Test full sync fails when already in progress."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = True
+        # Now the sync method itself raises the exception
+        mock_service.full_sync.side_effect = SyncInProgressError(
+            "A sync operation is already in progress"
+        )
         mock_get_service.return_value = mock_service
 
         response = client.post("/api/sync/full")
 
         assert response.status_code == 409
         data = response.json()
-        assert "already in progress" in data["detail"]
+        assert "already in progress" in data["detail"].lower()
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
@@ -148,7 +155,7 @@ class TestFullSyncEndpoint:
         """Test successful full sync."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
+        # No need to mock is_sync_in_progress anymore - it's checked inside the method
         mock_service.full_sync.return_value = SyncStatistics(
             total_fetched=100,
             created=80,
@@ -178,7 +185,6 @@ class TestFullSyncEndpoint:
 
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.full_sync.side_effect = CredentialsError("Invalid token")
         mock_get_service.return_value = mock_service
 
@@ -196,7 +202,6 @@ class TestFullSyncEndpoint:
         """Test full sync with unexpected error."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.full_sync.side_effect = Exception("Database error")
         mock_get_service.return_value = mock_service
 
@@ -227,16 +232,23 @@ class TestIncrementalSyncEndpoint:
         self, mock_get_service, mock_auth, client
     ):
         """Test incremental sync fails when already in progress."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = True
+        # Now the sync method itself raises the exception
+        mock_service.incremental_sync.side_effect = SyncInProgressError(
+            "A sync operation is already in progress"
+        )
         mock_get_service.return_value = mock_service
 
         response = client.post("/api/sync/incremental")
 
         assert response.status_code == 409
         data = response.json()
-        assert "already in progress" in data["detail"]
+        assert "already in progress" in data["detail"].lower()
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
@@ -244,7 +256,7 @@ class TestIncrementalSyncEndpoint:
         """Test successful incremental sync."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
+        # No need to mock is_sync_in_progress anymore
         mock_service.incremental_sync.return_value = SyncStatistics(
             total_fetched=10,
             created=2,
@@ -274,7 +286,6 @@ class TestIncrementalSyncEndpoint:
         """Test incremental sync when no changes."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.incremental_sync.return_value = SyncStatistics(
             total_fetched=0,
             created=0,
@@ -302,7 +313,6 @@ class TestIncrementalSyncEndpoint:
 
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.incremental_sync.side_effect = CredentialsError("Token expired")
         mock_get_service.return_value = mock_service
 
@@ -320,7 +330,6 @@ class TestIncrementalSyncEndpoint:
         """Test incremental sync with unexpected error."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.incremental_sync.side_effect = Exception("API failure")
         mock_get_service.return_value = mock_service
 
@@ -351,16 +360,23 @@ class TestAutoSyncEndpoint:
         self, mock_get_service, mock_auth, client
     ):
         """Test auto sync fails when already in progress."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = True
+        # Now the sync method itself raises the exception
+        mock_service.auto_sync.side_effect = SyncInProgressError(
+            "A sync operation is already in progress"
+        )
         mock_get_service.return_value = mock_service
 
         response = client.post("/api/sync")
 
         assert response.status_code == 409
         data = response.json()
-        assert "already in progress" in data["detail"]
+        assert "already in progress" in data["detail"].lower()
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
@@ -370,7 +386,6 @@ class TestAutoSyncEndpoint:
         """Test successful auto sync (incremental)."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         # Incremental sync stats (no created, only updated)
         mock_service.auto_sync.return_value = SyncStatistics(
             total_fetched=5,
@@ -398,7 +413,6 @@ class TestAutoSyncEndpoint:
         """Test successful auto sync (full)."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         # Full sync stats (created contacts)
         mock_service.auto_sync.return_value = SyncStatistics(
             total_fetched=100,
@@ -425,7 +439,6 @@ class TestAutoSyncEndpoint:
         """Test auto sync with no changes."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.auto_sync.return_value = SyncStatistics(
             total_fetched=0,
             created=0,
@@ -453,7 +466,6 @@ class TestAutoSyncEndpoint:
 
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.auto_sync.side_effect = CredentialsError("Invalid credentials")
         mock_get_service.return_value = mock_service
 
@@ -471,7 +483,6 @@ class TestAutoSyncEndpoint:
         """Test auto sync with unexpected error."""
         mock_auth.return_value = True
         mock_service = Mock()
-        mock_service.is_sync_in_progress.return_value = False
         mock_service.auto_sync.side_effect = Exception("Connection error")
         mock_get_service.return_value = mock_service
 

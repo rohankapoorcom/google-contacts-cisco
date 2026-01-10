@@ -5,10 +5,11 @@ synchronization of contacts from Google to the local database.
 """
 
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
-from typing import Any, Optional
+from typing import Any, Generator, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -30,8 +31,11 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Module-level lock for preventing concurrent syncs
-_sync_lock = Lock()
+
+class SyncInProgressError(Exception):
+    """Exception raised when a sync operation is attempted while another is in progress."""
+
+    pass
 
 
 @dataclass
@@ -111,6 +115,7 @@ class SyncService:
         self.contact_repo = ContactRepository(db)
         self.sync_repo = SyncRepository(db)
         self._google_client = google_client
+        self._sync_lock = Lock()  # Instance-level lock for this service
 
     @property
     def google_client(self) -> GoogleContactsClient:
@@ -128,16 +133,66 @@ class SyncService:
             self._google_client = get_google_client()
         return self._google_client
 
-    def full_sync(
+    @contextmanager
+    def _acquire_sync_lock(self, blocking: bool = True) -> Generator[None, None, None]:
+        """Acquire sync lock with database state check.
+
+        This context manager ensures that:
+        1. Only one sync can run at a time (thread-safe lock)
+        2. Database state is checked inside the lock to prevent TOCTOU race
+        3. Sync state is properly marked as SYNCING
+
+        Args:
+            blocking: If True, wait for lock. If False, raise immediately if locked.
+
+        Yields:
+            None when lock is acquired and database check passes
+
+        Raises:
+            SyncInProgressError: If sync is already in progress
+        """
+        acquired = self._sync_lock.acquire(blocking=blocking)
+        if not acquired:
+            logger.warning("Could not acquire sync lock - sync already in progress")
+            raise SyncInProgressError("A sync operation is already in progress")
+
+        try:
+            # Check database state inside the lock to avoid TOCTOU
+            if self.sync_repo.is_sync_in_progress():
+                logger.warning("Database shows sync already in progress")
+                raise SyncInProgressError("A sync operation is already in progress")
+
+            yield
+        finally:
+            self._sync_lock.release()
+
+    def _full_sync_impl(
         self,
         batch_size: int = 100,
         page_delay: float = 0.1,
     ) -> SyncStatistics:
-        """Perform full sync of all contacts from Google.
+        """Internal implementation of full sync without locking.
 
-        Downloads all contacts from Google, transforms them, and stores them
-        in the local database. Handles pagination automatically and stores
-        the sync token for future incremental syncs.
+        This method should only be called when the sync lock is already held.
+
+        Args:
+            batch_size: Number of contacts to commit per batch (default 100)
+            page_delay: Delay between API page requests in seconds (default 0.1)
+
+        Returns:
+            SyncStatistics with details about the sync operation
+
+        Raises:
+            Exception: If sync fails (sync state will be marked as error)
+        """
+    def _full_sync_impl(
+        self,
+        batch_size: int = 100,
+        page_delay: float = 0.1,
+    ) -> SyncStatistics:
+        """Internal implementation of full sync without locking.
+
+        This method should only be called when the sync lock is already held.
 
         Args:
             batch_size: Number of contacts to commit per batch (default 100)
@@ -215,6 +270,33 @@ class SyncService:
             )
             self.db.commit()
             raise
+
+    def full_sync(
+        self,
+        batch_size: int = 100,
+        page_delay: float = 0.1,
+    ) -> SyncStatistics:
+        """Perform full sync of all contacts from Google.
+
+        Downloads all contacts from Google, transforms them, and stores them
+        in the local database. Handles pagination automatically and stores
+        the sync token for future incremental syncs.
+
+        This method is protected by a lock to prevent concurrent sync operations.
+
+        Args:
+            batch_size: Number of contacts to commit per batch (default 100)
+            page_delay: Delay between API page requests in seconds (default 0.1)
+
+        Returns:
+            SyncStatistics with details about the sync operation
+
+        Raises:
+            SyncInProgressError: If a sync is already in progress
+            Exception: If sync fails (sync state will be marked as error)
+        """
+        with self._acquire_sync_lock():
+            return self._full_sync_impl(batch_size, page_delay)
 
     def _process_contacts_page(
         self,
@@ -335,16 +417,14 @@ class SyncService:
         """
         return self.sync_repo.is_sync_in_progress()
 
-    def incremental_sync(
+    def _incremental_sync_impl(
         self,
         batch_size: int = 100,
         page_delay: float = 0.1,
     ) -> SyncStatistics:
-        """Perform incremental sync using sync token.
+        """Internal implementation of incremental sync without locking.
 
-        Downloads only changes (new, modified, deleted contacts) since the last
-        sync using the stored sync token. Falls back to full sync if no token
-        is available or if the token has expired.
+        This method should only be called when the sync lock is already held.
 
         Args:
             batch_size: Number of contacts to commit per batch (default 100)
@@ -365,7 +445,7 @@ class SyncService:
             logger.warning(
                 "No sync token available, performing full sync instead"
             )
-            return self.full_sync(batch_size, page_delay)
+            return self._full_sync_impl(batch_size, page_delay)
 
         sync_token = sync_state.sync_token
         logger.info("Using sync token: %s...", sync_token[:20])
@@ -440,7 +520,7 @@ class SyncService:
                 error_message="Sync token expired, performing full sync",
             )
             self.db.commit()
-            return self.full_sync(batch_size, page_delay)
+            return self._full_sync_impl(batch_size, page_delay)
 
         except Exception as e:
             logger.exception("Incremental sync failed")
@@ -453,6 +533,33 @@ class SyncService:
             self.db.commit()
             raise
 
+    def incremental_sync(
+        self,
+        batch_size: int = 100,
+        page_delay: float = 0.1,
+    ) -> SyncStatistics:
+        """Perform incremental sync using sync token.
+
+        Downloads only changes (new, modified, deleted contacts) since the last
+        sync using the stored sync token. Falls back to full sync if no token
+        is available or if the token has expired.
+
+        This method is protected by a lock to prevent concurrent sync operations.
+
+        Args:
+            batch_size: Number of contacts to commit per batch (default 100)
+            page_delay: Delay between API page requests in seconds (default 0.1)
+
+        Returns:
+            SyncStatistics with details about the sync operation
+
+        Raises:
+            SyncInProgressError: If a sync is already in progress
+            Exception: If sync fails (sync state will be marked as error)
+        """
+        with self._acquire_sync_lock():
+            return self._incremental_sync_impl(batch_size, page_delay)
+
     def auto_sync(
         self,
         batch_size: int = 100,
@@ -463,31 +570,38 @@ class SyncService:
         Checks if a valid sync token exists and performs incremental sync if
         available, otherwise falls back to full sync.
 
+        This method is protected by a lock to prevent concurrent sync operations.
+
         Args:
             batch_size: Number of contacts to commit per batch (default 100)
             page_delay: Delay between API page requests in seconds (default 0.1)
 
         Returns:
             SyncStatistics with details about the sync operation
-        """
-        sync_state = self.sync_repo.get_latest_sync_state()
 
-        if sync_state and sync_state.sync_token:
-            logger.info("Sync token available, performing incremental sync")
-            return self.incremental_sync(batch_size, page_delay)
-        else:
-            logger.info("No sync token available, performing full sync")
-            return self.full_sync(batch_size, page_delay)
+        Raises:
+            SyncInProgressError: If a sync is already in progress
+        """
+        with self._acquire_sync_lock():
+            sync_state = self.sync_repo.get_latest_sync_state()
+
+            if sync_state and sync_state.sync_token:
+                logger.info("Sync token available, performing incremental sync")
+                return self._incremental_sync_impl(batch_size, page_delay)
+            else:
+                logger.info("No sync token available, performing full sync")
+                return self._full_sync_impl(batch_size, page_delay)
 
     def safe_auto_sync(
         self,
         batch_size: int = 100,
         page_delay: float = 0.1,
     ) -> dict[str, Any]:
-        """Perform auto sync with locking to prevent concurrent syncs.
+        """Perform auto sync with non-blocking lock to prevent concurrent syncs.
 
         Uses a thread-safe lock to ensure only one sync operation runs at a time.
-        If a sync is already in progress, returns immediately with a skipped status.
+        If a sync is already in progress, returns immediately with a skipped status
+        instead of waiting or raising an exception.
 
         Args:
             batch_size: Number of contacts to commit per batch
@@ -496,21 +610,26 @@ class SyncService:
         Returns:
             Dict with status, message, and statistics (if sync was performed)
         """
-        if not _sync_lock.acquire(blocking=False):
+        try:
+            # Try to acquire lock without blocking
+            with self._acquire_sync_lock(blocking=False):
+                stats = self._incremental_sync_impl(batch_size, page_delay) if (
+                    self.sync_repo.get_latest_sync_state() and 
+                    self.sync_repo.get_latest_sync_state().sync_token
+                ) else self._full_sync_impl(batch_size, page_delay)
+                
+                sync_type = stats.sync_type.capitalize()
+                return {
+                    "status": "success",
+                    "message": f"{sync_type} sync completed successfully",
+                    "statistics": stats.to_dict(),
+                }
+        except SyncInProgressError:
             logger.warning("Sync already in progress, skipping")
             return {
                 "status": "skipped",
                 "message": "Sync already in progress",
                 "statistics": {},
-            }
-
-        try:
-            stats = self.auto_sync(batch_size, page_delay)
-            sync_type = stats.sync_type.capitalize()
-            return {
-                "status": "success",
-                "message": f"{sync_type} sync completed successfully",
-                "statistics": stats.to_dict(),
             }
         except Exception as e:
             logger.exception("Safe auto sync failed")
@@ -519,8 +638,6 @@ class SyncService:
                 "message": str(e),
                 "statistics": {},
             }
-        finally:
-            _sync_lock.release()
 
     def get_sync_history(self, limit: int = 10) -> list[dict[str, Any]]:
         """Get sync history.

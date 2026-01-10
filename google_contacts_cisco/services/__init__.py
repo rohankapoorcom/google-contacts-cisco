@@ -19,7 +19,12 @@ from .google_client import (
     get_google_client,
 )
 from .search_service import SearchService, get_search_service
-from .sync_service import SyncService, SyncStatistics, get_sync_service
+from .sync_service import (
+    SyncInProgressError,
+    SyncService,
+    SyncStatistics,
+    get_sync_service,
+)
 from .xml_formatter import (
     GROUP_MAPPINGS,
     CiscoXMLFormatter,
@@ -44,6 +49,7 @@ __all__ = [
     # Sync service
     "SyncService",
     "SyncStatistics",
+    "SyncInProgressError",
     "get_sync_service",
     # XML formatter
     "CiscoXMLFormatter",

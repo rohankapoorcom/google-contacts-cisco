@@ -1126,3 +1126,175 @@ class TestClearSyncHistory:
 
         assert deleted_count == 0
 
+
+class TestConcurrentSyncProtection:
+    """Test concurrent sync protection with locking."""
+
+    def test_concurrent_full_sync_raises_exception(
+        self, sync_service, mock_google_client, db_session
+    ):
+        """Test that concurrent full sync raises SyncInProgressError."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
+        # Create a SYNCING state in the database to simulate sync in progress
+        sync_state = SyncState(
+            sync_status=SyncStatus.SYNCING,
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Attempt to start another sync should fail due to database check
+        with pytest.raises(SyncInProgressError) as exc_info:
+            sync_service.full_sync()
+
+        assert "already in progress" in str(exc_info.value).lower()
+
+    def test_concurrent_incremental_sync_raises_exception(
+        self, sync_service, mock_google_client, db_session
+    ):
+        """Test that concurrent incremental sync raises SyncInProgressError."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
+        # Create a SYNCING state in the database
+        sync_state = SyncState(
+            sync_status=SyncStatus.SYNCING,
+            sync_token="token123",
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Attempt to start incremental sync should fail
+        with pytest.raises(SyncInProgressError):
+            sync_service.incremental_sync()
+
+    def test_concurrent_auto_sync_raises_exception(
+        self, sync_service, mock_google_client, db_session
+    ):
+        """Test that concurrent auto sync raises SyncInProgressError."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
+        # Create a SYNCING state in the database
+        sync_state = SyncState(
+            sync_status=SyncStatus.SYNCING,
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Attempt to start auto sync should fail
+        with pytest.raises(SyncInProgressError):
+            sync_service.auto_sync()
+
+    def test_safe_auto_sync_returns_skipped_when_locked(
+        self, sync_service, mock_google_client, db_session
+    ):
+        """Test that safe_auto_sync returns skipped status instead of raising."""
+        # Create a SYNCING state in the database
+        sync_state = SyncState(
+            sync_status=SyncStatus.SYNCING,
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # safe_auto_sync should return skipped status
+        result = sync_service.safe_auto_sync()
+
+        assert result["status"] == "skipped"
+        assert "already in progress" in result["message"].lower()
+        assert result["statistics"] == {}
+
+    def test_database_sync_check_inside_lock(
+        self, sync_service, mock_google_client, db_session
+    ):
+        """Test that database sync state is checked inside the lock (TOCTOU fix)."""
+        from google_contacts_cisco.services.sync_service import (
+            SyncInProgressError,
+        )
+
+        # Create a sync state showing sync in progress in the database
+        sync_state = SyncState(
+            sync_status=SyncStatus.SYNCING,
+            last_sync_at=datetime.now(timezone.utc),
+        )
+        db_session.add(sync_state)
+        db_session.commit()
+
+        # Even though the lock is free, the database shows sync in progress
+        # This should be caught inside the lock to prevent TOCTOU race
+        with pytest.raises(SyncInProgressError) as exc_info:
+            sync_service.full_sync()
+
+        assert "already in progress" in str(exc_info.value).lower()
+
+    def test_sync_lock_is_released_on_error(
+        self, sync_service, mock_google_client, db_session
+    ):
+        """Test that the lock is properly released even when sync fails."""
+        # Mock the Google client to raise an exception
+        mock_google_client.list_connections.side_effect = Exception(
+            "API failure"
+        )
+
+        # Attempt sync which should fail
+        with pytest.raises(Exception, match="API failure"):
+            sync_service.full_sync()
+
+        # Verify lock is released by checking database state can be read
+        # and that we can acquire the lock
+        assert sync_service._sync_lock.acquire(blocking=False)
+        sync_service._sync_lock.release()
+
+        # Also verify database state shows error
+        latest = db_session.query(SyncState).order_by(
+            SyncState.last_sync_at.desc()
+        ).first()
+        assert latest is not None
+        assert latest.sync_status == SyncStatus.ERROR
+
+    def test_sync_after_successful_completion_releases_lock(
+        self, sync_service, mock_google_client
+    ):
+        """Test that lock is released after successful sync."""
+        # Mock the Google client for a successful sync - connections should be [] not None
+        mock_google_client.list_connections.return_value = [
+            {"connections": [], "nextPageToken": None, "nextSyncToken": "token123"}
+        ]
+
+        # Perform sync
+        stats = sync_service.full_sync()
+
+        assert stats.pages == 1
+
+        # Verify lock is released by starting another sync
+        stats2 = sync_service.full_sync()
+        assert stats2.pages == 1
+
+    def test_multiple_sync_service_instances_share_no_lock(
+        self, db_session, mock_google_client
+    ):
+        """Test that different SyncService instances have independent locks."""
+        # Create two separate service instances
+        mock_client2 = Mock()
+        service1 = SyncService(db_session, google_client=mock_google_client)
+        service2 = SyncService(db_session, google_client=mock_client2)
+
+        # Each should have its own lock
+        assert service1._sync_lock is not service2._sync_lock
+
+        # Acquiring lock on service1 should not affect service2
+        service1._sync_lock.acquire()
+        try:
+            assert service2._sync_lock.acquire(blocking=False)
+            service2._sync_lock.release()
+        finally:
+            service1._sync_lock.release()
+

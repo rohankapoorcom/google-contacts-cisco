@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from ..auth.oauth import is_authenticated
 from ..models import get_db
 from ..services.google_client import CredentialsError
-from ..services.sync_service import get_sync_service
+from ..services.sync_service import SyncInProgressError, get_sync_service
 
 logger = logging.getLogger(__name__)
 
@@ -155,15 +155,7 @@ async def trigger_full_sync(
     try:
         sync_service = get_sync_service(db)
 
-        # Check if sync is already in progress
-        if sync_service.is_sync_in_progress():
-            logger.warning("Full sync requested but sync already in progress")
-            raise HTTPException(
-                status_code=409,
-                detail="A sync is already in progress. Please wait for it to complete.",
-            )
-
-        # Perform full sync
+        # Perform full sync (lock is acquired inside the method)
         logger.info("Starting full sync triggered via API")
         stats = sync_service.full_sync()
 
@@ -173,6 +165,12 @@ async def trigger_full_sync(
             statistics=stats.to_dict(),
         )
 
+    except SyncInProgressError as e:
+        logger.warning("Full sync requested but sync already in progress")
+        raise HTTPException(
+            status_code=409,
+            detail=str(e),
+        )
     except CredentialsError as e:
         logger.error("Credentials error during sync: %s", e)
         raise HTTPException(
@@ -223,15 +221,7 @@ async def trigger_incremental_sync(
     try:
         sync_service = get_sync_service(db)
 
-        # Check if sync is already in progress
-        if sync_service.is_sync_in_progress():
-            logger.warning("Incremental sync requested but sync already in progress")
-            raise HTTPException(
-                status_code=409,
-                detail="A sync is already in progress. Please wait for it to complete.",
-            )
-
-        # Perform incremental sync
+        # Perform incremental sync (lock is acquired inside the method)
         logger.info("Starting incremental sync triggered via API")
         stats = sync_service.incremental_sync()
 
@@ -241,6 +231,12 @@ async def trigger_incremental_sync(
             statistics=stats.to_dict(),
         )
 
+    except SyncInProgressError as e:
+        logger.warning("Incremental sync requested but sync already in progress")
+        raise HTTPException(
+            status_code=409,
+            detail=str(e),
+        )
     except CredentialsError as e:
         logger.error("Credentials error during sync: %s", e)
         raise HTTPException(
@@ -293,15 +289,7 @@ async def trigger_auto_sync(
     try:
         sync_service = get_sync_service(db)
 
-        # Check if sync is already in progress
-        if sync_service.is_sync_in_progress():
-            logger.warning("Auto sync requested but sync already in progress")
-            raise HTTPException(
-                status_code=409,
-                detail="A sync is already in progress. Please wait for it to complete.",
-            )
-
-        # Perform auto sync
+        # Perform auto sync (lock is acquired inside the method)
         logger.info("Starting auto sync triggered via API")
         stats = sync_service.auto_sync()
 
@@ -314,6 +302,12 @@ async def trigger_auto_sync(
             statistics=stats.to_dict(),
         )
 
+    except SyncInProgressError as e:
+        logger.warning("Auto sync requested but sync already in progress")
+        raise HTTPException(
+            status_code=409,
+            detail=str(e),
+        )
     except CredentialsError as e:
         logger.error("Credentials error during sync: %s", e)
         raise HTTPException(
