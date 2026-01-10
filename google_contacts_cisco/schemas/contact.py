@@ -9,6 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, model_validator
 
+from ..config import get_settings
+from ..utils.datetime_utils import format_timestamp_for_display
 from ..utils.phone_utils import get_phone_normalizer
 
 
@@ -99,6 +101,8 @@ class ContactSchema(ContactCreateSchema):
     """Schema for contact with database fields.
 
     Extends ContactCreateSchema with fields that are populated by the database.
+    Timestamps are stored as datetime objects and should be formatted using
+    format_timestamp_for_display() when serializing to API responses.
     """
 
     id: UUID
@@ -107,6 +111,22 @@ class ContactSchema(ContactCreateSchema):
     synced_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+    
+    def to_api_dict(self, timezone: str = "UTC") -> dict:
+        """Convert to API-ready dictionary with timezone-aware timestamps.
+        
+        Args:
+            timezone: IANA timezone name for timestamp formatting
+            
+        Returns:
+            Dictionary with formatted timestamps suitable for API responses
+        """
+        data = self.model_dump()
+        data["created_at"] = format_timestamp_for_display(self.created_at, timezone)
+        data["updated_at"] = format_timestamp_for_display(self.updated_at, timezone)
+        data["synced_at"] = format_timestamp_for_display(self.synced_at, timezone) if self.synced_at else None
+        data["id"] = str(self.id)
+        return data
 
 
 class ContactSearchResultSchema(BaseModel):
@@ -160,10 +180,14 @@ class ContactResponse(BaseModel):
     phone_numbers: List[PhoneNumberResponse]
     email_addresses: List[EmailAddressResponse] = []
     updated_at: Optional[str] = None
+    created_at: Optional[str] = None
 
     @classmethod
     def from_orm(cls, contact):
-        """Create response from ORM model."""
+        """Create response from ORM model with timezone-aware timestamps.
+        
+        Timestamps are formatted using the configured timezone from application settings.
+        """
         # Get email addresses if the relationship exists
         email_addresses = []
         if hasattr(contact, 'email_addresses'):
@@ -172,6 +196,8 @@ class ContactResponse(BaseModel):
                 for e in contact.email_addresses
             ]
 
+        settings = get_settings()
+        
         return cls(
             id=str(contact.id),
             display_name=contact.display_name,
@@ -182,7 +208,8 @@ class ContactResponse(BaseModel):
                 for p in contact.phone_numbers
             ],
             email_addresses=email_addresses,
-            updated_at=contact.updated_at.isoformat() if contact.updated_at else None
+            updated_at=format_timestamp_for_display(contact.updated_at, settings.timezone) if contact.updated_at else None,
+            created_at=format_timestamp_for_display(contact.created_at, settings.timezone) if contact.created_at else None
         )
 
 
