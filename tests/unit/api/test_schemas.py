@@ -299,6 +299,37 @@ class TestGooglePerson:
         )
         assert person.get_display_name() == "test@test.com"
 
+    def test_get_display_name_whitespace_only_organization_skipped(self):
+        """Test get_display_name skips whitespace-only organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="   ")],
+            emailAddresses=[{"value": "test@test.com"}],
+        )
+        assert person.get_display_name() == "test@test.com"
+
+    def test_get_display_name_organization_with_whitespace_trimmed(self):
+        """Test get_display_name trims whitespace from organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="  Acme Corp  ")],
+        )
+        assert person.get_display_name() == "Acme Corp"
+
+    def test_get_display_name_skips_empty_orgs_uses_later_org(self):
+        """Test get_display_name skips empty organizations and uses first valid one."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[
+                GoogleOrganization(name=None),
+                GoogleOrganization(name=""),
+                GoogleOrganization(name="   "),
+                GoogleOrganization(name="Valid Corp"),
+                GoogleOrganization(name="Second Corp"),
+            ],
+        )
+        assert person.get_display_name() == "Valid Corp"
+
     def test_get_display_name_multiple_organizations_uses_first(self):
         """Test get_display_name uses first organization when multiple exist."""
         person = GooglePerson(

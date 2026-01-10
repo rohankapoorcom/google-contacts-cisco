@@ -115,8 +115,9 @@ class GooglePerson(BaseModel):
                 return name.family_name
 
         # Fall back to organization name for business contacts
-        if self.organizations and self.organizations[0].name:
-            return self.organizations[0].name
+        for org in self.organizations:
+            if org.name and org.name.strip():
+                return org.name.strip()
 
         # Fall back to email
         if self.email_addresses:
