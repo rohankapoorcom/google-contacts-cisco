@@ -71,7 +71,7 @@ class SyncScheduler:
         interval_seconds = self.interval_minutes * 60
 
         # Run initial sync immediately on startup
-        if self.running:
+        if self.running and not self._stop_event.is_set():
             self._run_sync()
 
         while self.running:

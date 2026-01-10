@@ -310,20 +310,26 @@ class TestSettingsValidation:
         settings = Settings(timezone="America/New_York")
         assert settings.timezone == "America/New_York"
 
-    def test_timezone_invalid_fallback_to_utc(self, monkeypatch):
+    def test_timezone_invalid_fallback_to_utc(self):
         """Test invalid timezone falls back to UTC."""
-        # Capture warning logs
         import logging
         import io
         
         log_stream = io.StringIO()
         handler = logging.StreamHandler(log_stream)
+        handler.setLevel(logging.WARNING)
         logging.root.addHandler(handler)
+        logging.root.setLevel(logging.WARNING)
         
-        settings = Settings(timezone="Invalid/Timezone")
-        assert settings.timezone == "UTC"
-        
-        logging.root.removeHandler(handler)
+        try:
+            settings = Settings(timezone="Invalid/Timezone")
+            assert settings.timezone == "UTC"
+            
+            # Verify the warning was logged
+            log_output = log_stream.getvalue()
+            assert "Invalid timezone" in log_output
+        finally:
+            logging.root.removeHandler(handler)
 
 
 class TestSettingsProperties:

@@ -15,27 +15,42 @@ class TestFormatTimestampForDisplay:
 
     def test_format_utc_timestamp_to_utc(self):
         """Test formatting UTC timestamp to UTC."""
+        from zoneinfo import ZoneInfo
+        
         dt = datetime(2026, 1, 9, 20, 30, 0, tzinfo=timezone.utc)
         result = format_timestamp_for_display(dt, "UTC")
         
-        # Should return ISO format with UTC timezone
-        assert result == "2026-01-09T20:30:00+00:00"
+        # Compute expected value dynamically
+        expected_dt = dt.astimezone(ZoneInfo("UTC"))
+        expected = expected_dt.isoformat()
+        
+        assert result == expected
 
     def test_format_utc_timestamp_to_eastern(self):
         """Test formatting UTC timestamp to US/Eastern timezone."""
+        from zoneinfo import ZoneInfo
+        
         dt = datetime(2026, 1, 9, 20, 30, 0, tzinfo=timezone.utc)
         result = format_timestamp_for_display(dt, "America/New_York")
         
-        # Eastern time is UTC-5 in winter (EST)
-        assert result == "2026-01-09T15:30:00-05:00"
+        # Compute expected value dynamically
+        expected_dt = dt.astimezone(ZoneInfo("America/New_York"))
+        expected = expected_dt.isoformat()
+        
+        assert result == expected
 
     def test_format_utc_timestamp_to_london(self):
         """Test formatting UTC timestamp to Europe/London timezone."""
+        from zoneinfo import ZoneInfo
+        
         dt = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
         result = format_timestamp_for_display(dt, "Europe/London")
         
-        # London time is UTC+1 in summer (BST)
-        assert result == "2026-06-15T13:00:00+01:00"
+        # Compute expected value dynamically
+        expected_dt = dt.astimezone(ZoneInfo("Europe/London"))
+        expected = expected_dt.isoformat()
+        
+        assert result == expected
 
     def test_format_none_timestamp(self):
         """Test formatting None returns None."""

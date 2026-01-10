@@ -146,11 +146,10 @@ class Settings(BaseSettings):
     def validate_timezone(cls, v: str) -> str:
         """Validate timezone is a valid IANA timezone."""
         try:
-            from zoneinfo import ZoneInfo
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
             # Try to create a ZoneInfo object to validate the timezone
             ZoneInfo(v)
-            return v
-        except Exception:
+        except (ZoneInfoNotFoundError, OSError, KeyError):
             # If zoneinfo fails, fallback to UTC
             import logging
             logging.warning(
@@ -159,6 +158,8 @@ class Settings(BaseSettings):
                 v
             )
             return "UTC"
+        
+        return v
 
     @property
     def database_path(self) -> Path:

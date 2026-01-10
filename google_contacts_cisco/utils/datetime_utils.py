@@ -41,11 +41,13 @@ def format_timestamp_for_display(
 
     # Convert to target timezone
     try:
+        from zoneinfo import ZoneInfoNotFoundError
+        
         target_tz = ZoneInfo(target_timezone)
         dt_local = dt.astimezone(target_tz)
         return dt_local.isoformat()
-    except Exception:
-        # If conversion fails, return UTC timestamp
+    except (ZoneInfoNotFoundError, OSError, ValueError, KeyError):
+        # If conversion fails (invalid timezone, missing tzdata, etc), return UTC timestamp
         return dt.isoformat()
 
 
