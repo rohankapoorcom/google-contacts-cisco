@@ -54,20 +54,20 @@ class PhoneNumberSchema(BaseModel):
             if normalized is None:
                 # Fallback to simple digit extraction if normalization fails
                 # This handles edge cases where phonenumbers library can't parse
-                # First strip any dialing prefixes
-                import re
-                prefix_pattern = r"^[\s]*([*#]\d{1,3}[#])[\s]*|^[\s]*([*]\d{2})(?=[\s\-\(\)\+\.])"
-                cleaned_value = re.sub(prefix_pattern, "", value).strip()
-                # Handle multiple prefixes
-                cleaned_value = re.sub(prefix_pattern, "", cleaned_value).strip()
-                
-                # Extract digits and + for international
-                digits = "".join(c for c in cleaned_value if c.isdigit() or c == "+")
-                if not digits or (digits == "+" and len(digits) == 1):
+                # Reuse _clean_input to strip prefixes and extensions
+                cleaned_value, _detected_prefix = normalizer._clean_input(value)
+
+                # Extract digits; keep a single leading '+' if present
+                digits_only = "".join(c for c in cleaned_value if c.isdigit())
+                if cleaned_value.strip().startswith("+") and digits_only:
+                    normalized = f"+{digits_only}"
+                else:
+                    normalized = digits_only
+
+                if not normalized or normalized == "+":
                     raise ValueError(
                         f"Phone number must contain at least one digit: {value}"
                     )
-                normalized = digits
 
             # Update the data with normalized values
             data["value"] = normalized

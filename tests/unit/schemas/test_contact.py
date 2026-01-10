@@ -9,10 +9,10 @@ import pytest
 from pydantic import ValidationError
 
 from google_contacts_cisco.schemas.contact import (
-    PhoneNumberSchema,
     ContactCreateSchema,
     ContactSchema,
     ContactSearchResultSchema,
+    PhoneNumberSchema,
 )
 
 
@@ -116,7 +116,7 @@ class TestPhoneNumberSchema:
             value="*67 202-555-1234",
             display_value="*67 (202) 555-1234",
         )
-        
+
         # Value should be normalized without prefix
         assert phone.value == "+12025551234"
         # Display should preserve original with prefix
@@ -128,7 +128,7 @@ class TestPhoneNumberSchema:
             value="*82 (202) 555-1234",
             display_value="*82 (202) 555-1234",
         )
-        
+
         assert phone.value == "+12025551234"
         assert "*82" in phone.display_value
 
@@ -138,7 +138,7 @@ class TestPhoneNumberSchema:
             value="#31# +44 20 7946 0958",
             display_value="#31# +44 20 7946 0958",
         )
-        
+
         assert phone.value == "+442079460958"
         assert "#31#" in phone.display_value
 
@@ -148,7 +148,7 @@ class TestPhoneNumberSchema:
             value="*31# +33 1 42 86 82 00",
             display_value="*31# +33 1 42 86 82 00",
         )
-        
+
         assert phone.value == "+33142868200"
         assert "*31#" in phone.display_value
 
@@ -158,7 +158,7 @@ class TestPhoneNumberSchema:
             value="*67 2025551234",
             display_value="*67 2025551234",  # Will be formatted
         )
-        
+
         # Should normalize correctly
         assert phone.value == "+12025551234"
         # Display is preserved as provided
@@ -170,7 +170,7 @@ class TestPhoneNumberSchema:
             value="*67 202-555-1234 ext 456",
             display_value="*67 (202) 555-1234",
         )
-        
+
         # Prefix stripped, extension removed, normalized
         assert phone.value == "+12025551234"
         assert "ext" not in phone.value
@@ -178,14 +178,15 @@ class TestPhoneNumberSchema:
 
     def test_phone_number_fallback_with_prefix(self):
         """Test that fallback logic handles prefixes."""
-        # Use a format that might trigger fallback but still has valid digits
+        # Force phonenumbers parse failure (trailing junk), but keep digits for fallback
         phone = PhoneNumberSchema(
-            value="*67 +1 202 555 1234",
-            display_value="*67 +1 202 555 1234",
+            value="*67 +1 202 555 1234 !!!",
+            display_value="*67 +1 202 555 1234 !!!",
         )
-        
-        # Should successfully normalize
-        assert phone.value in ["+12025551234", "+1202555123 4"] or "202" in phone.value
+
+        # Should successfully normalize via digit-extraction fallback
+        assert phone.value == "+12025551234"
+        assert "*67" in phone.display_value
 
 
 class TestContactCreateSchema:

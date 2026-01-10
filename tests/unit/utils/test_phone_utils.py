@@ -47,7 +47,7 @@ class TestPhoneNumberNormalizerInit:
 
 class TestNormalizeUSNumbers:
     """Tests for normalizing US phone numbers.
-    
+
     Note: Uses 202 (Washington DC) area code as 555 is a fictional prefix
     that the phonenumbers library marks as invalid.
     """
@@ -493,7 +493,7 @@ class TestFormatDisplay:
     def test_format_us_national(self, normalizer):
         """US numbers should format as national."""
         import phonenumbers
-        
+
         parsed = phonenumbers.parse("+12025551234", "US")
         display = normalizer._format_display(parsed)
         # Should be in national format: (202) 555-1234
@@ -504,7 +504,7 @@ class TestFormatDisplay:
     def test_format_international(self, normalizer):
         """Non-US numbers should include country code."""
         import phonenumbers
-        
+
         parsed = phonenumbers.parse("+442079460958", "US")
         display = normalizer._format_display(parsed)
         assert "+44" in display
@@ -531,7 +531,7 @@ class TestPhoneNumberPrefixes:
         normalized, display = normalizer.normalize("*82 (202) 555-1234")
         assert normalized == "+12025551234"
         assert "*82" in display
-        
+
     def test_normalize_with_star66_prefix(self, normalizer):
         """Should handle *66 (repeat last call) prefix."""
         normalized, display = normalizer.normalize("*66 202-555-1234")
@@ -540,7 +540,7 @@ class TestPhoneNumberPrefixes:
 
     def test_normalize_with_star69_prefix(self, normalizer):
         """Should handle *69 (return last call) prefix."""
-        normalized, display = normalizer.normalize("*69 2025551234")
+        normalized, _ = normalizer.normalize("*69 2025551234")
         assert normalized == "+12025551234"
 
     # European prefix tests
@@ -565,7 +565,7 @@ class TestPhoneNumberPrefixes:
 
     def test_prefix_with_spaces(self, normalizer):
         """Should handle prefix with spaces in number."""
-        normalized, display = normalizer.normalize("*67   202 555 1234")
+        normalized, _ = normalizer.normalize("*67   202 555 1234")
         assert normalized == "+12025551234"
 
     def test_prefix_no_space_after(self, normalizer):
@@ -577,7 +577,7 @@ class TestPhoneNumberPrefixes:
 
     def test_prefix_with_international_format(self, normalizer):
         """Should handle prefix with international number."""
-        normalized, display = normalizer.normalize("*67 +1 202 555 1234")
+        normalized, _ = normalizer.normalize("*67 +1 202 555 1234")
         assert normalized == "+12025551234"
 
     # Mixed prefix and extension tests
@@ -591,7 +591,7 @@ class TestPhoneNumberPrefixes:
     # Edge cases
     def test_prefix_only_no_number(self, normalizer):
         """Should return None for prefix only."""
-        normalized, display = normalizer.normalize("*67")
+        normalized, _ = normalizer.normalize("*67")
         assert normalized is None
 
     def test_prefix_with_invalid_number(self, normalizer):
@@ -604,14 +604,14 @@ class TestPhoneNumberPrefixes:
     def test_multiple_prefixes(self, normalizer):
         """Should handle first prefix only."""
         # This is an edge case - multiple prefixes aren't valid but we handle gracefully
-        normalized, display = normalizer.normalize("*67 *82 202-555-1234")
+        normalized, _ = normalizer.normalize("*67 *82 202-555-1234")
         assert normalized == "+12025551234"
 
     # Display value preservation
     def test_prefix_preserves_custom_display(self, normalizer):
         """Should preserve custom display value even with prefix."""
         normalized, display = normalizer.normalize(
-            "*67 2025551234", 
+            "*67 2025551234",
             display_value="Hidden: (202) 555-1234"
         )
         assert normalized == "+12025551234"
