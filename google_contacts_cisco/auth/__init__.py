@@ -7,8 +7,10 @@ for accessing Google Contacts API.
 from .oauth import (
     CredentialsNotConfiguredError,
     OAuthError,
+    PermanentTokenRefreshError,
     TokenExchangeError,
     TokenRefreshError,
+    TransientTokenRefreshError,
     credentials_to_dict,
     delete_token_file,
     get_auth_status,
@@ -29,6 +31,8 @@ __all__ = [
     "CredentialsNotConfiguredError",
     "TokenExchangeError",
     "TokenRefreshError",
+    "PermanentTokenRefreshError",
+    "TransientTokenRefreshError",
     # Functions
     "get_oauth_client",
     "get_credentials",
