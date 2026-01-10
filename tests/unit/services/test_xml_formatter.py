@@ -223,6 +223,54 @@ class TestGroupDirectory(TestCiscoXMLFormatter):
         name = menu_items[0].find("Name").text
         assert "(No contacts)" in name
 
+    def test_contact_with_empty_name_shows_unnamed(self, formatter):
+        """Test that contact with empty name shows 'Unnamed Contact'."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/empty",
+            display_name="",
+        )
+        contacts = [contact]
+        xml_str = formatter.generate_group_directory("2ABC", contacts)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        menu_items = root.findall("MenuItem")
+        assert len(menu_items) == 1
+        name = menu_items[0].find("Name").text
+        assert name == "Unnamed Contact"
+
+    def test_contact_with_whitespace_name_shows_unnamed(self, formatter):
+        """Test that contact with whitespace-only name shows 'Unnamed Contact'."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/whitespace",
+            display_name="   ",
+        )
+        contacts = [contact]
+        xml_str = formatter.generate_group_directory("2ABC", contacts)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        menu_items = root.findall("MenuItem")
+        assert len(menu_items) == 1
+        name = menu_items[0].find("Name").text
+        assert name == "Unnamed Contact"
+
+    def test_contact_with_none_name_shows_unnamed(self, formatter):
+        """Test that contact with None name shows 'Unnamed Contact'."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/none",
+            display_name=None,
+        )
+        contacts = [contact]
+        xml_str = formatter.generate_group_directory("2ABC", contacts)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        menu_items = root.findall("MenuItem")
+        assert len(menu_items) == 1
+        name = menu_items[0].find("Name").text
+        assert name == "Unnamed Contact"
+
     def test_has_help_softkey_with_group_context(self, formatter, sample_contact):
         """Test that help soft key has correct group context."""
         contacts = [sample_contact]
@@ -308,6 +356,48 @@ class TestContactDirectory(TestCiscoXMLFormatter):
         entries = root.findall("DirectoryEntry")
         assert len(entries) == 1
         assert "No phone numbers" in entries[0].find("Name").text
+
+    def test_contact_with_empty_name_title_shows_unnamed(self, formatter, contact_no_phones):
+        """Test that contact title with empty name shows 'Unnamed Contact'."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/empty",
+            display_name="",
+        )
+        contact.phone_numbers = []
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        title = root.find("Title")
+        assert title.text == "Unnamed Contact"
+
+    def test_contact_with_whitespace_name_title_shows_unnamed(self, formatter):
+        """Test that contact title with whitespace-only name shows 'Unnamed Contact'."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/whitespace",
+            display_name="   ",
+        )
+        contact.phone_numbers = []
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        title = root.find("Title")
+        assert title.text == "Unnamed Contact"
+
+    def test_contact_with_none_name_title_shows_unnamed(self, formatter):
+        """Test that contact title with None name shows 'Unnamed Contact'."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/none",
+            display_name=None,
+        )
+        contact.phone_numbers = []
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        title = root.find("Title")
+        assert title.text == "Unnamed Contact"
 
     def test_has_exit_softkey(self, formatter, sample_contact):
         """Test that Exit soft key is present."""
@@ -474,6 +564,36 @@ class TestContactToGroupMapping(TestCiscoXMLFormatter):
             id=uuid.uuid4(),
             resource_name="people/test",
             display_name=None,
+        )
+        group = formatter.map_contact_to_group(contact)
+        assert group == "0"
+
+    def test_whitespace_only_name_maps_to_0(self, formatter):
+        """Test that whitespace-only name maps to 0 group."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="   ",
+        )
+        group = formatter.map_contact_to_group(contact)
+        assert group == "0"
+
+    def test_tab_only_name_maps_to_0(self, formatter):
+        """Test that tab-only name maps to 0 group."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="\t\t",
+        )
+        group = formatter.map_contact_to_group(contact)
+        assert group == "0"
+
+    def test_newline_only_name_maps_to_0(self, formatter):
+        """Test that newline-only name maps to 0 group."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="\n",
         )
         group = formatter.map_contact_to_group(contact)
         assert group == "0"

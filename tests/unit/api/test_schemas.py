@@ -231,6 +231,30 @@ class TestGooglePerson:
         )
         assert person.get_display_name() == "John Doe"
 
+    def test_get_display_name_strips_whitespace(self):
+        """Test get_display_name strips leading/trailing whitespace."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            names=[GoogleName(displayName="  John Doe  ")],
+        )
+        assert person.get_display_name() == "John Doe"
+
+    def test_get_display_name_whitespace_only_falls_through(self):
+        """Test get_display_name with whitespace-only displayName falls through."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            names=[GoogleName(displayName="   ")],
+        )
+        assert person.get_display_name() == "Unnamed Contact"
+
+    def test_get_display_name_empty_string_falls_through(self):
+        """Test get_display_name with empty string displayName falls through."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            names=[GoogleName(displayName="")],
+        )
+        assert person.get_display_name() == "Unnamed Contact"
+
     def test_get_display_name_constructs_from_parts(self):
         """Test get_display_name constructs name from given and family name."""
         person = GooglePerson(
@@ -238,6 +262,22 @@ class TestGooglePerson:
             names=[GoogleName(givenName="John", familyName="Doe")],
         )
         assert person.get_display_name() == "John Doe"
+
+    def test_get_display_name_constructs_from_parts_strips_whitespace(self):
+        """Test get_display_name strips whitespace from given and family name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            names=[GoogleName(givenName="  John  ", familyName="  Doe  ")],
+        )
+        assert person.get_display_name() == "John Doe"
+
+    def test_get_display_name_whitespace_only_parts_falls_through(self):
+        """Test get_display_name with whitespace-only parts falls through."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            names=[GoogleName(givenName="  ", familyName="  ")],
+        )
+        assert person.get_display_name() == "Unnamed Contact"
 
     def test_get_display_name_given_only(self):
         """Test get_display_name with only given name."""
@@ -263,10 +303,10 @@ class TestGooglePerson:
         )
         assert person.get_display_name() == "john@example.com"
 
-    def test_get_display_name_fallback_to_resource_name(self):
-        """Test get_display_name falls back to resource name as last resort."""
+    def test_get_display_name_fallback_to_unnamed_contact(self):
+        """Test get_display_name falls back to 'Unnamed Contact' as last resort."""
         person = GooglePerson(resourceName="people/c123")
-        assert person.get_display_name() == "people/c123"
+        assert person.get_display_name() == "Unnamed Contact"
 
     def test_is_deleted_true(self):
         """Test is_deleted returns True when metadata.deleted is True."""
