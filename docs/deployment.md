@@ -49,8 +49,36 @@ This guide covers Options 1 and 2. For Kubernetes deployment, adapt the Docker c
 
 - Docker Engine 20.10+
 - Docker Compose 2.0+
-- 2GB RAM minimum
+- 2GB RAM minimum (4GB+ recommended for large contact lists)
 - 10GB disk space
+
+### Memory Requirements
+
+The application's memory usage scales with contact list size during synchronization:
+
+| Contact Count | Minimum RAM | Recommended RAM | Notes |
+|--------------|-------------|-----------------|-------|
+| < 1,000      | 512MB       | 1GB            | Standard usage |
+| 1,000-5,000  | 1GB         | 2GB            | Light to moderate usage |
+| 5,000-10,000 | 2GB         | 4GB            | Moderate to heavy usage |
+| 10,000+      | 4GB         | 8GB            | Heavy usage |
+
+**Memory Management Features:**
+- Automatic session cleanup after each batch (100 contacts by default)
+- Identity map clearing to prevent memory buildup
+- Configurable batch sizes for memory-constrained environments
+- Optional memory monitoring with psutil
+
+**Tuning for Low-Memory Systems:**
+
+If running on a memory-constrained system, adjust the sync batch size:
+
+```python
+# In your environment variables or config
+SYNC_BATCH_SIZE=50  # Default is 100
+```
+
+Smaller batch sizes result in more frequent commits but lower peak memory usage.
 
 ### Step 1: Create Dockerfile
 
