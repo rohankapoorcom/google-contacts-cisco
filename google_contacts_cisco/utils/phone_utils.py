@@ -36,6 +36,9 @@ class PhoneNumberNormalizer:
     ) -> Tuple[Optional[str], str]:
         """Normalize phone number to E.164 format.
 
+        Handles dialing prefixes like *67, *82, #31# by stripping them before normalization
+        while preserving them in the display value.
+
         Args:
             phone_number: Raw phone number string
             display_value: Optional display format (if different from phone_number)
@@ -43,19 +46,19 @@ class PhoneNumberNormalizer:
         Returns:
             Tuple of (normalized_value, display_value)
             - normalized_value: E.164 format or None if invalid
-            - display_value: Original or formatted display value
+            - display_value: Original or formatted display value (with prefix if present)
         """
         if not phone_number:
             return None, ""
 
-        # Clean input
-        cleaned = self._clean_input(phone_number)
+        # Clean input and extract prefix
+        cleaned, detected_prefix = self._clean_input(phone_number)
 
-        # Store display value
+        # Store display value (preserve original with prefix)
         final_display = display_value or phone_number
 
         try:
-            # Parse phone number
+            # Parse phone number (without prefix)
             parsed = phonenumbers.parse(cleaned, self.default_country)
 
             # Validate
@@ -68,11 +71,15 @@ class PhoneNumberNormalizer:
                 parsed, phonenumbers.PhoneNumberFormat.E164
             )
 
-            # If no display value provided, format nicely
+            # If no display value provided, format nicely (with prefix if detected)
             if not display_value:
-                final_display = self._format_display(parsed)
+                formatted = self._format_display(parsed)
+                if detected_prefix:
+                    final_display = f"{detected_prefix} {formatted}"
+                else:
+                    final_display = formatted
 
-            logger.debug("Normalized %s to %s", phone_number, normalized)
+            logger.debug("Normalized %s to %s (prefix: %s)", phone_number, normalized, detected_prefix)
             return normalized, final_display
 
         except NumberParseException as e:
@@ -122,23 +129,54 @@ class PhoneNumberNormalizer:
         # Try suffix matching (last N digits)
         return self._suffix_match(stored_number, normalized_search)
 
-    def _clean_input(self, phone_number: str) -> str:
-        """Clean phone number input.
+    def _clean_input(self, phone_number: str) -> Tuple[str, Optional[str]]:
+        """Clean phone number input and extract dialing prefixes.
+
+        Detects and removes common dialing prefixes like *67, *82, #31# before normalization.
 
         Args:
             phone_number: Raw input
 
         Returns:
-            Cleaned string with extensions removed
+            Tuple of (cleaned_number, detected_prefix)
+            - cleaned_number: Number without prefix and extensions
+            - detected_prefix: Detected dialing prefix or None
+
+        Supported prefixes:
+            - North American: *67 (hide caller ID), *82 (show caller ID), *66, etc.
+            - European: #31# (hide caller ID), *31# (show caller ID)
         """
         # Remove common separators but keep + for international
         cleaned = phone_number.strip()
+
+        # Detect and strip dialing prefixes at the start
+        # Pattern matches: 
+        # - #digits# (like #31#) - must end with #
+        # - *digits# (like *31#) - must end with #
+        # - *digits (like *67, *82) - must be followed by non-digit or whitespace
+        # This prevents matching *672 in "*67202" as a complete prefix
+        prefix_pattern = r"^[\s]*([*#]\d{1,3}[#])[\s]*|^[\s]*([*]\d{2})(?=[\s\-\(\)\+\.])"
+        prefix_match = re.match(prefix_pattern, cleaned)
+        detected_prefix = None
+        
+        if prefix_match:
+            # Get the matched group (either group 1 or 2)
+            detected_prefix = prefix_match.group(1) or prefix_match.group(2)
+            cleaned = cleaned[prefix_match.end():]
+            cleaned = cleaned.strip()
+            
+            # Check if what remains looks like another prefix (multiple prefixes case)
+            # Strip the second prefix too
+            second_prefix_match = re.match(prefix_pattern, cleaned)
+            if second_prefix_match:
+                cleaned = cleaned[second_prefix_match.end():]
+                cleaned = cleaned.strip()
 
         # Handle extensions (remove them for normalization)
         ext_pattern = r"\s*(ext|extension|x)\s*\.?\s*\d+$"
         cleaned = re.sub(ext_pattern, "", cleaned, flags=re.IGNORECASE)
 
-        return cleaned
+        return cleaned, detected_prefix
 
     def _format_display(self, parsed: phonenumbers.PhoneNumber) -> str:
         """Format phone number for display.

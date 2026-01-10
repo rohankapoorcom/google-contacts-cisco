@@ -9,10 +9,10 @@ import pytest
 from pydantic import ValidationError
 
 from google_contacts_cisco.schemas.contact import (
-    PhoneNumberSchema,
     ContactCreateSchema,
     ContactSchema,
     ContactSearchResultSchema,
+    PhoneNumberSchema,
 )
 
 
@@ -109,6 +109,84 @@ class TestPhoneNumberSchema:
             PhoneNumberSchema(value="()-", display_value="()-")
 
         assert "must contain at least one digit" in str(exc_info.value)
+
+    def test_phone_number_with_star67_prefix(self):
+        """Test phone number with *67 prefix is handled correctly."""
+        phone = PhoneNumberSchema(
+            value="*67 202-555-1234",
+            display_value="*67 (202) 555-1234",
+        )
+
+        # Value should be normalized without prefix
+        assert phone.value == "+12025551234"
+        # Display should preserve original with prefix
+        assert phone.display_value == "*67 (202) 555-1234"
+
+    def test_phone_number_with_star82_prefix(self):
+        """Test phone number with *82 prefix."""
+        phone = PhoneNumberSchema(
+            value="*82 (202) 555-1234",
+            display_value="*82 (202) 555-1234",
+        )
+
+        assert phone.value == "+12025551234"
+        assert "*82" in phone.display_value
+
+    def test_phone_number_with_hash31hash_prefix(self):
+        """Test phone number with #31# European prefix."""
+        phone = PhoneNumberSchema(
+            value="#31# +44 20 7946 0958",
+            display_value="#31# +44 20 7946 0958",
+        )
+
+        assert phone.value == "+442079460958"
+        assert "#31#" in phone.display_value
+
+    def test_phone_number_with_star31hash_prefix(self):
+        """Test phone number with *31# European prefix."""
+        phone = PhoneNumberSchema(
+            value="*31# +33 1 42 86 82 00",
+            display_value="*31# +33 1 42 86 82 00",
+        )
+
+        assert phone.value == "+33142868200"
+        assert "*31#" in phone.display_value
+
+    def test_phone_number_prefix_auto_display(self):
+        """Test that prefix is included in auto-generated display."""
+        phone = PhoneNumberSchema(
+            value="*67 2025551234",
+            display_value="*67 2025551234",  # Will be formatted
+        )
+
+        # Should normalize correctly
+        assert phone.value == "+12025551234"
+        # Display is preserved as provided
+        assert "*67" in phone.display_value
+
+    def test_phone_number_prefix_with_extension(self):
+        """Test prefix with extension is handled correctly."""
+        phone = PhoneNumberSchema(
+            value="*67 202-555-1234 ext 456",
+            display_value="*67 (202) 555-1234",
+        )
+
+        # Prefix stripped, extension removed, normalized
+        assert phone.value == "+12025551234"
+        assert "ext" not in phone.value
+        assert "*67" in phone.display_value
+
+    def test_phone_number_fallback_with_prefix(self):
+        """Test that fallback logic handles prefixes."""
+        # Force phonenumbers parse failure (trailing junk), but keep digits for fallback
+        phone = PhoneNumberSchema(
+            value="*67 +1 202 555 1234 !!!",
+            display_value="*67 +1 202 555 1234 !!!",
+        )
+
+        # Should successfully normalize via digit-extraction fallback
+        assert phone.value == "+12025551234"
+        assert "*67" in phone.display_value
 
 
 class TestContactCreateSchema:
