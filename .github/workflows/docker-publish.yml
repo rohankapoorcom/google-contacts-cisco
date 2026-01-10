@@ -7,6 +7,10 @@ on:
   pull_request:
     branches:
       - 'main'
+  workflow_run:
+    workflows: ["CI - Tests and Linting"]
+    types:
+      - completed
 
 env:
   REGISTRY: ghcr.io
@@ -14,6 +18,10 @@ env:
 
 jobs:
   build-and-push-image:
+    # Only run if CI workflow succeeded or if manually triggered
+    if: |
+      github.event_name != 'workflow_run' || 
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write

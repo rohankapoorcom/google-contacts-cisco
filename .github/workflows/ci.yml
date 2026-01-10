@@ -25,54 +25,21 @@ env:
   PYTEST_ADDOPTS: "--color=yes"
 
 jobs:
-  lint:
-    name: Lint (Ruff, Black, Mypy)
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      
-      - name: Install dependencies
-        run: |
-          uv sync --dev
-      
-      - name: Run ruff linting
-        run: |
-          echo "::group::Ruff Linting"
-          uv run ruff check .
-          echo "::endgroup::"
-      
-      - name: Run black format check
-        run: |
-          echo "::group::Black Format Check"
-          uv run black --check .
-          echo "::endgroup::"
-      
-      - name: Run mypy type checking
-        run: |
-          echo "::group::Mypy Type Checking"
-          uv run mypy google_contacts_cisco
-          echo "::endgroup::"
-
-  test:
-    name: Test (Python ${{ matrix.python-version }})
+  backend:
+    name: Backend (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.13', '3.14-dev']
+        include:
+          - python-version: '3.13'
+            continue-on-error: false
+          - python-version: '3.14-dev'
+            continue-on-error: true
+    
+    continue-on-error: ${{ matrix.continue-on-error }}
     
     steps:
       - name: Checkout code
@@ -101,6 +68,24 @@ jobs:
         run: |
           uv sync --dev
       
+      - name: Run ruff linting
+        run: |
+          echo "::group::Ruff Linting"
+          uv run ruff check .
+          echo "::endgroup::"
+      
+      - name: Run black format check
+        run: |
+          echo "::group::Black Format Check"
+          uv run black --check .
+          echo "::endgroup::"
+      
+      - name: Run mypy type checking
+        run: |
+          echo "::group::Mypy Type Checking"
+          uv run mypy google_contacts_cisco
+          echo "::endgroup::"
+      
       - name: Run tests with coverage
         run: |
           echo "::group::Running Tests"
@@ -114,7 +99,7 @@ jobs:
           echo "::endgroup::"
       
       - name: Upload coverage report (XML)
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.13' && always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-xml
@@ -122,7 +107,7 @@ jobs:
           retention-days: 30
       
       - name: Upload coverage report (HTML)
-        if: matrix.python-version == '3.12'
+        if: matrix.python-version == '3.13' && always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-html
@@ -139,8 +124,8 @@ jobs:
           fi
           echo "::notice::Coverage check passed: ${COVERAGE}% (threshold: 80%)"
 
-  frontend-checks:
-    name: Frontend Checks
+  frontend:
+    name: Frontend
     runs-on: ubuntu-latest
     
     steps:
@@ -203,7 +188,7 @@ jobs:
   summary:
     name: CI Summary
     runs-on: ubuntu-latest
-    needs: [lint, test, frontend-checks]
+    needs: [backend, frontend]
     if: always()
     
     steps:
@@ -212,28 +197,21 @@ jobs:
           echo "### CI Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ needs.lint.result }}" == "success" ]; then
-            echo "✅ Linting: Passed" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ needs.backend.result }}" == "success" ]; then
+            echo "✅ Backend: Passed" >> $GITHUB_STEP_SUMMARY
           else
-            echo "❌ Linting: Failed" >> $GITHUB_STEP_SUMMARY
+            echo "❌ Backend: Failed" >> $GITHUB_STEP_SUMMARY
           fi
           
-          if [ "${{ needs.test.result }}" == "success" ]; then
-            echo "✅ Tests: Passed" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Tests: Failed" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          if [ "${{ needs.frontend-checks.result }}" == "success" ]; then
+          if [ "${{ needs.frontend.result }}" == "success" ]; then
             echo "✅ Frontend: Passed" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Frontend: Failed" >> $GITHUB_STEP_SUMMARY
           fi
           
           # Determine overall status
-          if [ "${{ needs.lint.result }}" == "success" ] && \
-             [ "${{ needs.test.result }}" == "success" ] && \
-             [ "${{ needs.frontend-checks.result }}" == "success" ]; then
+          if [ "${{ needs.backend.result }}" == "success" ] && \
+             [ "${{ needs.frontend.result }}" == "success" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "🎉 **All CI checks passed!**" >> $GITHUB_STEP_SUMMARY
             exit 0
