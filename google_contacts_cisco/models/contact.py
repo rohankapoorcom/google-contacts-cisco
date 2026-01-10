@@ -37,6 +37,9 @@ class Contact(Base):
     phone_numbers = relationship(
         "PhoneNumber", back_populates="contact", cascade="all, delete-orphan"
     )
+    email_addresses = relationship(
+        "EmailAddress", back_populates="contact", cascade="all, delete-orphan"
+    )
 
     # Indexes
     __table_args__ = (
