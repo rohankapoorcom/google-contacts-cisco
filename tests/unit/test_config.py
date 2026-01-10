@@ -103,6 +103,21 @@ class TestSettingsDefaults:
         settings = Settings()
         assert settings.search_results_limit == 50
 
+    def test_sync_scheduler_enabled_default(self):
+        """Test sync scheduler is disabled by default."""
+        settings = Settings()
+        assert settings.sync_scheduler_enabled is False
+
+    def test_sync_interval_minutes_default(self):
+        """Test default sync interval."""
+        settings = Settings()
+        assert settings.sync_interval_minutes == 60
+
+    def test_timezone_default(self):
+        """Test default timezone is UTC."""
+        settings = Settings()
+        assert settings.timezone == "UTC"
+
 
 class TestSettingsFromEnvironment:
     """Test configuration loading from environment variables."""
@@ -167,6 +182,24 @@ class TestSettingsFromEnvironment:
         assert settings.log_level == "ERROR"
         assert settings.port == 9000
         assert settings.google_client_id == "multi-test-id"
+
+    def test_sync_scheduler_enabled_from_env(self, monkeypatch):
+        """Test loading sync scheduler enabled from environment."""
+        monkeypatch.setenv("SYNC_SCHEDULER_ENABLED", "true")
+        settings = Settings()
+        assert settings.sync_scheduler_enabled is True
+
+    def test_sync_interval_minutes_from_env(self, monkeypatch):
+        """Test loading sync interval from environment."""
+        monkeypatch.setenv("SYNC_INTERVAL_MINUTES", "30")
+        settings = Settings()
+        assert settings.sync_interval_minutes == 30
+
+    def test_timezone_from_env(self, monkeypatch):
+        """Test loading timezone from environment."""
+        monkeypatch.setenv("TIMEZONE", "America/New_York")
+        settings = Settings()
+        assert settings.timezone == "America/New_York"
 
 
 class TestSettingsValidation:
@@ -251,6 +284,52 @@ class TestSettingsValidation:
         for level in valid_levels:
             settings = Settings(log_level=level)
             assert settings.log_level == level
+
+    def test_sync_interval_too_low_raises_error(self):
+        """Test sync interval below 5 minutes raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            Settings(sync_interval_minutes=4)
+        assert "sync_interval" in str(exc_info.value).lower()
+
+    def test_sync_interval_too_high_raises_error(self):
+        """Test sync interval above 1440 minutes raises ValidationError."""
+        with pytest.raises(ValidationError) as exc_info:
+            Settings(sync_interval_minutes=1441)
+        assert "sync_interval" in str(exc_info.value).lower()
+
+    def test_sync_interval_valid_boundaries(self):
+        """Test valid sync interval boundary values."""
+        settings_min = Settings(sync_interval_minutes=5)
+        assert settings_min.sync_interval_minutes == 5
+
+        settings_max = Settings(sync_interval_minutes=1440)
+        assert settings_max.sync_interval_minutes == 1440
+
+    def test_timezone_valid(self):
+        """Test valid timezone is accepted."""
+        settings = Settings(timezone="America/New_York")
+        assert settings.timezone == "America/New_York"
+
+    def test_timezone_invalid_fallback_to_utc(self):
+        """Test invalid timezone falls back to UTC."""
+        import logging
+        import io
+        
+        log_stream = io.StringIO()
+        handler = logging.StreamHandler(log_stream)
+        handler.setLevel(logging.WARNING)
+        logging.root.addHandler(handler)
+        logging.root.setLevel(logging.WARNING)
+        
+        try:
+            settings = Settings(timezone="Invalid/Timezone")
+            assert settings.timezone == "UTC"
+            
+            # Verify the warning was logged
+            log_output = log_stream.getvalue()
+            assert "Invalid timezone" in log_output
+        finally:
+            logging.root.removeHandler(handler)
 
 
 class TestSettingsProperties:

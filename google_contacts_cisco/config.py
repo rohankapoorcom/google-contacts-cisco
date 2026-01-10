@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     sync_scheduler_enabled: bool = False  # Enable background sync scheduler
     sync_interval_minutes: int = 60  # Sync interval in minutes (min 5)
 
+    # Timezone Settings
+    timezone: str = "UTC"  # Timezone for timestamp display (e.g., "America/New_York", "Europe/London")
+
     # Search Settings
     search_results_limit: int = 50  # Max search results to return
 
@@ -136,6 +139,26 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             # Split comma-separated string and strip whitespace
             return [ip.strip() for ip in v.split(",") if ip.strip()]
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v: str) -> str:
+        """Validate timezone is a valid IANA timezone."""
+        try:
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            # Try to create a ZoneInfo object to validate the timezone
+            ZoneInfo(v)
+        except (ZoneInfoNotFoundError, OSError, KeyError):
+            # If zoneinfo fails, fallback to UTC
+            import logging
+            logging.warning(
+                "Invalid timezone '%s', falling back to UTC. "
+                "Use IANA timezone names (e.g., 'America/New_York', 'Europe/London')",
+                v
+            )
+            return "UTC"
+        
         return v
 
     @property

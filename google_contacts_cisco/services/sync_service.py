@@ -14,6 +14,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..api.schemas import GoogleConnectionsResponse, GooglePerson
+from ..config import settings
 from ..models.phone_number import PhoneNumber
 from ..models.sync_state import SyncState, SyncStatus
 from ..repositories.contact_repository import ContactRepository
@@ -24,6 +25,7 @@ from ..services.google_client import (
     SyncTokenExpiredError,
     get_google_client,
 )
+from ..utils.datetime_utils import format_timestamp_for_display
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -294,10 +296,9 @@ class SyncService:
         if sync_state:
             return {
                 "status": sync_state.sync_status.value,
-                "last_sync_at": (
-                    sync_state.last_sync_at.isoformat()
-                    if sync_state.last_sync_at
-                    else None
+                "last_sync_at": format_timestamp_for_display(
+                    sync_state.last_sync_at,
+                    settings.timezone
                 ),
                 "has_sync_token": sync_state.sync_token is not None,
                 "error_message": sync_state.error_message,
@@ -544,8 +545,9 @@ class SyncService:
             history.append({
                 "id": str(state.id),
                 "status": state.sync_status.value,
-                "last_sync_at": (
-                    state.last_sync_at.isoformat() if state.last_sync_at else None
+                "last_sync_at": format_timestamp_for_display(
+                    state.last_sync_at,
+                    settings.timezone
                 ),
                 "has_sync_token": state.sync_token is not None,
                 "error_message": state.error_message,
@@ -595,10 +597,9 @@ class SyncService:
             },
             "phone_numbers": phone_count,
             "sync": {
-                "last_sync_at": (
-                    latest_sync.last_sync_at.isoformat()
-                    if latest_sync and latest_sync.last_sync_at
-                    else None
+                "last_sync_at": format_timestamp_for_display(
+                    latest_sync.last_sync_at if latest_sync else None,
+                    settings.timezone
                 ),
                 "status": (
                     latest_sync.sync_status.value if latest_sync else "never_synced"
