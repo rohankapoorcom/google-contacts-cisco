@@ -5,6 +5,7 @@ This document outlines testing standards, best practices, and guidelines for the
 ## Table of Contents
 
 - [Overview](#overview)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Running Tests](#running-tests)
 - [Test Organization](#test-organization)
 - [Writing Tests](#writing-tests)
@@ -44,6 +45,270 @@ Our testing approach emphasizes:
 - **High Priority**: 85% minimum
   - `api/`: API endpoints
   - `schemas/`: Data validation
+
+## CI/CD Pipeline
+
+### Overview
+
+The project uses GitHub Actions for continuous integration and continuous deployment. All tests, linting, and quality checks run automatically on every pull request and push to main.
+
+### Workflow Triggers
+
+The CI pipeline runs on:
+
+1. **Pull Requests** to `main` branch
+   - All quality checks must pass before merging
+   - Provides fast feedback on code changes
+
+2. **Pushes** to `main` branch
+   - Validates merged code
+   - Ensures main branch always passes tests
+
+3. **Daily Schedule** (6 AM UTC)
+   - Catches dependency issues
+   - Detects breaking changes in external services
+
+4. **Manual Dispatch**
+   - On-demand workflow runs
+   - Useful for testing workflow changes
+
+### CI Jobs
+
+#### 1. Lint Job
+
+Runs code quality checks:
+- **Ruff**: Fast Python linter for code quality
+- **Black**: Code formatting verification
+- **Mypy**: Static type checking
+
+```bash
+# Replicate locally:
+uv run ruff check .
+uv run black --check .
+uv run mypy google_contacts_cisco
+```
+
+**Fail Conditions**:
+- Any linting violations
+- Code formatting issues
+- Type checking errors
+
+#### 2. Test Job
+
+Runs comprehensive test suite across Python versions:
+
+**Matrix**: Python 3.10, 3.11, 3.12, 3.13
+
+**Test Execution**:
+- Full pytest suite with coverage
+- Coverage threshold: 80% minimum
+- XML and HTML coverage reports generated
+
+**Optimizations**:
+- Dependency caching via uv
+- Pytest cache for faster reruns
+- Parallel matrix execution
+
+**Artifacts**:
+- Coverage XML report (30 days retention)
+- Coverage HTML report (30 days retention)
+
+```bash
+# Replicate locally (matches CI):
+uv run pytest \
+  --cov=google_contacts_cisco \
+  --cov-report=xml \
+  --cov-report=term-missing \
+  --cov-report=html \
+  --cov-fail-under=80 \
+  -v
+```
+
+**Fail Conditions**:
+- Any test failures
+- Coverage below 80%
+- Test errors or crashes
+
+#### 3. Frontend Checks Job
+
+Validates frontend code quality:
+- Installs Node.js dependencies
+- Runs frontend linting (if configured)
+- Runs frontend tests (if configured)
+- Builds production bundle
+
+```bash
+# Replicate locally:
+cd frontend
+npm ci
+npm run lint     # If configured
+npm test         # If configured
+npm run build
+```
+
+**Fail Conditions**:
+- Linting errors
+- Test failures
+- Build errors
+
+#### 4. Summary Job
+
+Provides consolidated results:
+- Aggregates all job results
+- Creates summary in GitHub Actions UI
+- Sets overall workflow status
+
+### Quality Gates
+
+**All PRs must pass**:
+- ✅ Ruff linting (zero violations)
+- ✅ Black formatting (properly formatted)
+- ✅ Mypy type checking (zero errors)
+- ✅ All tests passing on Python 3.10-3.13
+- ✅ Coverage ≥ 80%
+- ✅ Frontend build successful
+
+### Viewing CI Results
+
+#### In Pull Requests:
+1. Navigate to your PR
+2. Scroll to "Checks" section
+3. View detailed logs for any failures
+4. Re-run failed jobs if needed
+
+#### In GitHub Actions Tab:
+1. Go to repository → Actions
+2. Select "CI - Tests and Linting" workflow
+3. View run history and logs
+4. Download coverage artifacts
+
+### Downloading Coverage Reports
+
+Coverage reports are uploaded as artifacts (Python 3.12 only):
+
+1. Go to Actions → Select workflow run
+2. Scroll to "Artifacts" section
+3. Download:
+   - `coverage-xml`: Machine-readable format
+   - `coverage-html`: Interactive HTML report
+
+### Local Testing to Match CI
+
+To ensure your changes will pass CI before pushing:
+
+```bash
+# Full CI simulation
+./scripts/test.sh                    # Run tests with coverage
+uv run ruff check .                  # Lint
+uv run black --check .               # Format check
+uv run mypy google_contacts_cisco    # Type check
+
+# Or use the dev script that runs all checks
+./scripts/dev.sh --check-all
+```
+
+### Debugging CI Failures
+
+#### Linting Failures
+
+```bash
+# Check what failed
+uv run ruff check .
+
+# Auto-fix issues
+uv run ruff check --fix .
+
+# Format code
+uv run black .
+```
+
+#### Type Checking Failures
+
+```bash
+# Run mypy locally
+uv run mypy google_contacts_cisco
+
+# Show error context
+uv run mypy --show-error-context google_contacts_cisco
+
+# Ignore specific errors (use sparingly)
+# Add inline: # type: ignore[error-code]
+```
+
+#### Test Failures
+
+```bash
+# Run failing test with verbose output
+./scripts/test.sh -vv -k test_name
+
+# Run with debugging
+./scripts/test.sh -s -k test_name
+
+# Check specific Python version
+uv run --python 3.10 pytest
+```
+
+#### Coverage Failures
+
+```bash
+# Generate detailed coverage report
+./scripts/coverage-report.sh
+
+# Identify missing coverage
+python scripts/verify-coverage.py
+
+# View HTML report
+open htmlcov/index.html
+```
+
+### CI Configuration Files
+
+- **Workflow**: `.github/workflows/ci.yml`
+- **Python Config**: `pyproject.toml` (pytest, ruff, black, mypy)
+- **Dependencies**: `pyproject.toml` (dependency-groups.dev)
+- **Test Scripts**: `scripts/test.sh`, `scripts/coverage-report.sh`
+
+### Best Practices for CI
+
+1. **Run tests locally before pushing**
+   ```bash
+   ./scripts/test.sh && uv run ruff check . && uv run black --check .
+   ```
+
+2. **Fix linting issues immediately**
+   - Don't disable linting rules without good reason
+   - Use `ruff --fix` for auto-fixable issues
+
+3. **Maintain coverage above 80%**
+   - Add tests for new code
+   - Verify coverage locally: `./scripts/coverage-report.sh`
+
+4. **Keep CI green**
+   - Don't merge failing PRs
+   - Fix broken CI immediately
+   - Daily runs catch dependency issues early
+
+5. **Review CI logs on failures**
+   - Read full error messages
+   - Check all job logs, not just failed ones
+   - Look for patterns in test failures
+
+### Scheduled Runs
+
+Daily automated runs (6 AM UTC):
+- Detect dependency issues
+- Catch breaking changes in Google APIs
+- Verify tests remain stable
+- No notifications unless failed
+
+**If scheduled run fails**:
+1. Check GitHub Actions → CI workflow
+2. Review failure logs
+3. Determine if issue is:
+   - Dependency version conflict
+   - External API change
+   - Test flakiness
+4. Create issue and fix promptly
 
 ## Running Tests
 
