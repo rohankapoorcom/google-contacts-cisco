@@ -4,12 +4,13 @@ This module tests the SyncRepository implementation for managing
 synchronization state in the database.
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from google_contacts_cisco.models import Base, SyncState
+from google_contacts_cisco.models import Base
 from google_contacts_cisco.models.sync_state import SyncStatus
 from google_contacts_cisco.repositories.sync_repository import SyncRepository
 
@@ -19,7 +20,7 @@ def db_session():
     """Create test database session with in-memory SQLite."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
     yield session
     session.close()
@@ -287,4 +288,3 @@ class TestDeleteAllSyncStates:
         """Test deleting when no sync states exist."""
         count = sync_repo.delete_all()
         assert count == 0
-

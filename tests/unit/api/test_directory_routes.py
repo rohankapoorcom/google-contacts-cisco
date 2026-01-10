@@ -248,7 +248,16 @@ class TestMainDirectoryEndpoint:
         # Verify group names
         group_names = [item.find("Name").text for item in menu_items]
         expected_groups = [
-            "1", "2ABC", "3DEF", "4GHI", "5JKL", "6MNO", "7PQRS", "8TUV", "9WXYZ", "0"
+            "1",
+            "2ABC",
+            "3DEF",
+            "4GHI",
+            "5JKL",
+            "6MNO",
+            "7PQRS",
+            "8TUV",
+            "9WXYZ",
+            "0",
         ]
         assert group_names == expected_groups
 
@@ -691,7 +700,7 @@ class TestSpecialCharacters:
         contact = Contact(
             id=uuid.uuid4(),
             resource_name="people/special123",
-            display_name="Test <Company> & \"Friends\"",
+            display_name='Test <Company> & "Friends"',
             deleted=False,
         )
         db_session.add(contact)
@@ -889,5 +898,3 @@ class TestContactsWithoutPhoneNumbersFiltered:
         assert len(entries) == 1
         name = entries[0].find("Name").text
         assert "No phone" in name
-
-

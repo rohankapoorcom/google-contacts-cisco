@@ -1,10 +1,13 @@
 """Database models and connection."""
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import declarative_base, sessionmaker
-from ..config import settings
 
 # Create database directory if it doesn't exist
 from pathlib import Path
+
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+from ..config import settings
+
 Path("data").mkdir(exist_ok=True)
 
 # Create engine with error handling
@@ -12,7 +15,7 @@ try:
     engine = create_engine(
         settings.database_url,
         connect_args={"check_same_thread": False},  # Needed for SQLite
-        echo=settings.debug  # Log SQL queries in debug mode
+        echo=settings.debug,  # Log SQL queries in debug mode
     )
 except Exception as e:
     raise RuntimeError(
@@ -28,6 +31,7 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
+
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -50,4 +54,13 @@ from .contact import Contact  # noqa: E402
 from .phone_number import PhoneNumber  # noqa: E402
 from .sync_state import SyncState, SyncStatus  # noqa: E402
 
-__all__ = ["Base", "engine", "SessionLocal", "get_db", "Contact", "PhoneNumber", "SyncState", "SyncStatus"]
+__all__ = [
+    "Base",
+    "engine",
+    "SessionLocal",
+    "get_db",
+    "Contact",
+    "PhoneNumber",
+    "SyncState",
+    "SyncStatus",
+]

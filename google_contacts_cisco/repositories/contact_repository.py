@@ -132,15 +132,15 @@ class ContactRepository:
             Updated contact entity
         """
         # Update contact fields
-        existing.etag = contact_data.etag
-        existing.given_name = contact_data.given_name
-        existing.family_name = contact_data.family_name
-        existing.display_name = contact_data.display_name
-        existing.organization = contact_data.organization
-        existing.job_title = contact_data.job_title
-        existing.deleted = contact_data.deleted
-        existing.synced_at = datetime.now(timezone.utc)
-        existing.updated_at = datetime.now(timezone.utc)
+        existing.etag = contact_data.etag  # type: ignore[assignment]
+        existing.given_name = contact_data.given_name  # type: ignore[assignment]
+        existing.family_name = contact_data.family_name  # type: ignore[assignment]
+        existing.display_name = contact_data.display_name  # type: ignore[assignment]
+        existing.organization = contact_data.organization  # type: ignore[assignment]
+        existing.job_title = contact_data.job_title  # type: ignore[assignment]
+        existing.deleted = contact_data.deleted  # type: ignore[assignment]
+        existing.synced_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+        existing.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
         # Delete old phone numbers
         self.db.query(PhoneNumber).filter(
@@ -158,9 +158,7 @@ class ContactRepository:
             )
             self.db.add(phone)
 
-        logger.debug(
-            "Updated contact: %s (%s)", existing.display_name, existing.id
-        )
+        logger.debug("Updated contact: %s (%s)", existing.display_name, existing.id)
         return existing
 
     def mark_as_deleted(self, resource_name: str) -> Optional[Contact]:
@@ -174,9 +172,9 @@ class ContactRepository:
         """
         contact = self.get_by_resource_name(resource_name)
         if contact:
-            contact.deleted = True
-            contact.synced_at = datetime.now(timezone.utc)
-            contact.updated_at = datetime.now(timezone.utc)
+            contact.deleted = True  # type: ignore[assignment]
+            contact.synced_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+            contact.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             logger.debug("Marked contact as deleted: %s", resource_name)
             return contact
         return None
@@ -188,9 +186,7 @@ class ContactRepository:
             List of active contacts
         """
         return (
-            self.db.query(Contact)
-            .filter(Contact.deleted == False)  # noqa: E712
-            .all()
+            self.db.query(Contact).filter(Contact.deleted == False).all()  # noqa: E712
         )
 
     def get_all_active_with_phones(self) -> List[Contact]:
@@ -300,10 +296,7 @@ class ContactRepository:
         return []
 
     def get_contacts(
-        self,
-        limit: int = 30,
-        offset: int = 0,
-        sort_by_recent: bool = False
+        self, limit: int = 30, offset: int = 0, sort_by_recent: bool = False
     ) -> List[Contact]:
         """Get contacts with pagination and sorting.
 
@@ -315,10 +308,7 @@ class ContactRepository:
         Returns:
             List of active contacts
         """
-        query = (
-            self.db.query(Contact)
-            .filter(Contact.deleted == False)  # noqa: E712
-        )
+        query = self.db.query(Contact).filter(Contact.deleted == False)  # noqa: E712
 
         if sort_by_recent:
             query = query.order_by(Contact.updated_at.desc())
@@ -332,7 +322,7 @@ class ContactRepository:
         letter: str,
         limit: int = 30,
         offset: int = 0,
-        sort_by_recent: bool = False
+        sort_by_recent: bool = False,
     ) -> List[Contact]:
         """Get contacts filtered by first letter of display name.
 
@@ -345,25 +335,20 @@ class ContactRepository:
         Returns:
             List of active contacts starting with the specified letter
         """
-        query = (
-            self.db.query(Contact)
-            .filter(Contact.deleted == False)  # noqa: E712
-        )
+        query = self.db.query(Contact).filter(Contact.deleted == False)  # noqa: E712
 
         if letter == "#":
             # Match contacts starting with non-alphabetic characters
             # Cross-database compatible: check first character is not alphabetic
             from sqlalchemy import func
+
             first_char = func.substr(Contact.display_name, 1, 1)
             query = query.filter(
-                ~first_char.between('A', 'Z'),
-                ~first_char.between('a', 'z')
+                ~first_char.between("A", "Z"), ~first_char.between("a", "z")
             )
         else:
             # Match contacts starting with specific letter (case-insensitive)
-            query = query.filter(
-                Contact.display_name.ilike(f"{letter}%")
-            )
+            query = query.filter(Contact.display_name.ilike(f"{letter}%"))
 
         if sort_by_recent:
             query = query.order_by(Contact.updated_at.desc())
@@ -393,25 +378,20 @@ class ContactRepository:
         Returns:
             Number of active contacts starting with the specified letter
         """
-        query = (
-            self.db.query(Contact)
-            .filter(Contact.deleted == False)  # noqa: E712
-        )
+        query = self.db.query(Contact).filter(Contact.deleted == False)  # noqa: E712
 
         if letter == "#":
             # Count contacts starting with non-alphabetic characters
             # Cross-database compatible: check first character is not alphabetic
             from sqlalchemy import func
+
             first_char = func.substr(Contact.display_name, 1, 1)
             query = query.filter(
-                ~first_char.between('A', 'Z'),
-                ~first_char.between('a', 'z')
+                ~first_char.between("A", "Z"), ~first_char.between("a", "z")
             )
         else:
             # Count contacts starting with specific letter (case-insensitive)
-            query = query.filter(
-                Contact.display_name.ilike(f"{letter}%")
-            )
+            query = query.filter(Contact.display_name.ilike(f"{letter}%"))
 
         return query.count()
 
@@ -428,10 +408,7 @@ class ContactRepository:
             uuid_id = UUID(contact_id)
             return (
                 self.db.query(Contact)
-                .filter(
-                    Contact.id == uuid_id,
-                    Contact.deleted == False  # noqa: E712
-                )
+                .filter(Contact.id == uuid_id, Contact.deleted == False)  # noqa: E712
                 .first()
             )
         except (ValueError, AttributeError):
@@ -448,8 +425,6 @@ class ContactRepository:
             - total_phone_numbers: Total phone number records
             - total_emails: Total email records
         """
-        from ..models.contact import EmailAddress
-
         total_contacts = self.count_contacts()
 
         # Count contacts with phone numbers
@@ -461,14 +436,8 @@ class ContactRepository:
             .count()
         )
 
-        # Count contacts with emails
-        contacts_with_email = (
-            self.db.query(Contact.id)
-            .join(EmailAddress)
-            .filter(Contact.deleted == False)  # noqa: E712
-            .distinct()
-            .count()
-        )
+        # Count contacts with emails (not implemented - email model doesn't exist)
+        contacts_with_email = 0
 
         # Count total phone numbers
         total_phone_numbers = (
@@ -478,13 +447,8 @@ class ContactRepository:
             .count()
         )
 
-        # Count total emails
-        total_emails = (
-            self.db.query(EmailAddress)
-            .join(Contact)
-            .filter(Contact.deleted == False)  # noqa: E712
-            .count()
-        )
+        # Count total emails (not implemented - email model doesn't exist)
+        total_emails = 0
 
         return {
             "total_contacts": total_contacts,
@@ -493,4 +457,3 @@ class ContactRepository:
             "total_phone_numbers": total_phone_numbers,
             "total_emails": total_emails,
         }
-

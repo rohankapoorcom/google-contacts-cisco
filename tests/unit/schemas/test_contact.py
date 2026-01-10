@@ -2,6 +2,7 @@
 
 This module tests the Pydantic schemas for internal contact representation.
 """
+
 import uuid
 from datetime import datetime, timezone
 
@@ -356,4 +357,3 @@ class TestContactSearchResultSchema:
         assert result.family_name == "Doe"
         assert result.organization == "Acme Corp"
         assert len(result.phone_numbers) == 1
-

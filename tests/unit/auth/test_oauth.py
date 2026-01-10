@@ -12,9 +12,8 @@ This module tests all OAuth functionality including:
 import json
 import os
 import stat
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from google.auth.exceptions import RefreshError
@@ -550,7 +549,8 @@ class TestRevokeCredentials:
                 "post",
                 side_effect=Exception("Network error"),
             ):
-                # Since the module imports requests directly, we also need to patch it there
+                # Since the module imports requests directly,
+                # we also need to patch it there
                 with patch(
                     "google_contacts_cisco.auth.oauth.requests.post",
                 ) as mock_post:
@@ -789,4 +789,3 @@ def _create_mock_credentials() -> Credentials:
         client_secret="test_client_secret",
         scopes=["https://www.googleapis.com/auth/contacts.readonly"],
     )
-

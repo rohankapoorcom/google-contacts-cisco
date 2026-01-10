@@ -3,6 +3,7 @@
 These schemas are used for internal data representation and validation,
 separate from the Google API-specific schemas.
 """
+
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
@@ -111,13 +112,13 @@ class ContactSchema(ContactCreateSchema):
     synced_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
-    
+
     def to_api_dict(self, timezone: str = "UTC") -> dict:
         """Convert to API-ready dictionary with timezone-aware timestamps.
-        
+
         Args:
             timezone: IANA timezone name for timestamp formatting
-            
+
         Returns:
             Dictionary with formatted timestamps suitable for API responses
         """
@@ -146,6 +147,7 @@ class ContactSearchResultSchema(BaseModel):
 
 
 # API Response Schemas
+
 
 class PhoneNumberResponse(BaseModel):
     """Phone number response schema for API."""
@@ -185,31 +187,38 @@ class ContactResponse(BaseModel):
     @classmethod
     def from_orm(cls, contact):
         """Create response from ORM model with timezone-aware timestamps.
-        
-        Timestamps are formatted using the configured timezone from application settings.
+
+        Timestamps are formatted using the configured timezone from
+        application settings.
         """
         # Get email addresses if the relationship exists
         email_addresses = []
-        if hasattr(contact, 'email_addresses'):
+        if hasattr(contact, "email_addresses"):
             email_addresses = [
-                EmailAddressResponse.model_validate(e)
-                for e in contact.email_addresses
+                EmailAddressResponse.model_validate(e) for e in contact.email_addresses
             ]
 
         settings = get_settings()
-        
+
         return cls(
             id=str(contact.id),
             display_name=contact.display_name,
             given_name=contact.given_name,
             family_name=contact.family_name,
             phone_numbers=[
-                PhoneNumberResponse.model_validate(p)
-                for p in contact.phone_numbers
+                PhoneNumberResponse.model_validate(p) for p in contact.phone_numbers
             ],
             email_addresses=email_addresses,
-            updated_at=format_timestamp_for_display(contact.updated_at, settings.timezone) if contact.updated_at else None,
-            created_at=format_timestamp_for_display(contact.created_at, settings.timezone) if contact.created_at else None
+            updated_at=(
+                format_timestamp_for_display(contact.updated_at, settings.timezone)
+                if contact.updated_at
+                else None
+            ),
+            created_at=(
+                format_timestamp_for_display(contact.created_at, settings.timezone)
+                if contact.created_at
+                else None
+            ),
         )
 
 
@@ -221,4 +230,3 @@ class ContactListResponse(BaseModel):
     offset: int
     limit: int
     has_more: bool
-

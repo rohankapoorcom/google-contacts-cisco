@@ -2,6 +2,7 @@
 
 This module tests the Pydantic schemas for parsing Google People API responses.
 """
+
 import pytest
 
 from google_contacts_cisco.api.schemas import (
@@ -480,4 +481,3 @@ class TestGoogleConnectionsResponse:
 
         assert response.next_page_token == "token123"
         assert response.total_items == 50
-

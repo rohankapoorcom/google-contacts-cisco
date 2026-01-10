@@ -80,7 +80,8 @@ app = FastAPI(
     description="""
 # Google Contacts to Cisco IP Phone Application
 
-A comprehensive web application that syncs Google Contacts and serves them to Cisco IP Phones via XML directory service.
+A comprehensive web application that syncs Google Contacts and serves them
+to Cisco IP Phones via XML directory service.
 
 ## Features
 
@@ -122,19 +123,31 @@ For issues and questions, check the troubleshooting guide or review application 
     openapi_tags=[
         {
             "name": "authentication",
-            "description": "OAuth 2.0 authentication with Google. Complete the OAuth flow to access Google Contacts API.",
+            "description": (
+                "OAuth 2.0 authentication with Google. "
+                "Complete the OAuth flow to access Google Contacts API."
+            ),
         },
         {
             "name": "contacts",
-            "description": "Contact management endpoints. List, search, and retrieve contact information.",
+            "description": (
+                "Contact management endpoints. "
+                "List, search, and retrieve contact information."
+            ),
         },
         {
             "name": "synchronization",
-            "description": "Sync operations with Google Contacts. Supports full and incremental synchronization.",
+            "description": (
+                "Sync operations with Google Contacts. "
+                "Supports full and incremental synchronization."
+            ),
         },
         {
             "name": "Cisco Directory",
-            "description": "XML directory endpoints for Cisco IP Phones. Provides three-level hierarchy (main → group → contact).",
+            "description": (
+                "XML directory endpoints for Cisco IP Phones. "
+                "Provides three-level hierarchy (main → group → contact)."
+            ),
         },
         {
             "name": "google",
@@ -158,14 +171,16 @@ if settings.trusted_proxies:
 # CORS middleware (for development)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://127.0.0.1:5173",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
-    ]
-    if settings.debug
-    else [],
+    allow_origins=(
+        [
+            "http://localhost:5173",  # Vite dev server
+            "http://127.0.0.1:5173",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
+        if settings.debug
+        else []
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -220,7 +235,8 @@ if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
             raise HTTPException(status_code=404, detail="Not found")
 
         # Check for static file first (e.g., vite.svg, favicon.ico)
-        # Prevent path traversal attacks by resolving and checking path is within STATIC_DIR
+        # Prevent path traversal attacks by resolving and checking
+        # path is within STATIC_DIR
         static_file = STATIC_DIR / full_path
         resolved = static_file.resolve()
         try:

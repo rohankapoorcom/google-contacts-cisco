@@ -5,11 +5,10 @@ on Contact and PhoneNumber entities.
 """
 
 import pytest
-from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from google_contacts_cisco.models import Base, Contact, PhoneNumber
+from google_contacts_cisco.models import Base, PhoneNumber
 from google_contacts_cisco.repositories.contact_repository import ContactRepository
 from google_contacts_cisco.schemas.contact import ContactCreateSchema, PhoneNumberSchema
 
@@ -19,7 +18,7 @@ def db_session():
     """Create test database session with in-memory SQLite."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
     yield session
     session.close()
@@ -72,7 +71,9 @@ def sample_contact_minimal():
 class TestCreateContact:
     """Test contact creation functionality."""
 
-    def test_create_contact_success(self, contact_repo, db_session, sample_contact_data):
+    def test_create_contact_success(
+        self, contact_repo, db_session, sample_contact_data
+    ):
         """Test creating a contact with all fields."""
         contact = contact_repo.create_contact(sample_contact_data)
         db_session.commit()
@@ -108,7 +109,9 @@ class TestCreateContact:
         assert len(work_phones) == 1
         assert work_phones[0].value == "5559876543"
 
-    def test_create_contact_minimal(self, contact_repo, db_session, sample_contact_minimal):
+    def test_create_contact_minimal(
+        self, contact_repo, db_session, sample_contact_minimal
+    ):
         """Test creating contact with only required fields."""
         contact = contact_repo.create_contact(sample_contact_minimal)
         db_session.commit()
@@ -431,7 +434,7 @@ class TestGetContacts:
         db_session.commit()
 
         results = contact_repo.get_all_active_with_phones()
-        
+
         # Should return exactly 3 contacts with specific names
         assert len(results) == 3
         display_names = {c.display_name for c in results}

@@ -34,9 +34,7 @@ class TestTransformGooglePersonToContact:
                     familyName="Doe",
                 )
             ],
-            phoneNumbers=[
-                GooglePhoneNumber(value="(555) 123-4567", type="mobile")
-            ],
+            phoneNumbers=[GooglePhoneNumber(value="(555) 123-4567", type="mobile")],
             organizations=[GoogleOrganization(name="Acme Corp", title="Engineer")],
         )
 
@@ -358,4 +356,3 @@ class TestTransformGooglePersonsBatch:
         assert contacts[1].family_name == "Smith"
         assert contacts[1].job_title == "Manager"
         assert contacts[1].phone_numbers[0].value == "5552222222"
-

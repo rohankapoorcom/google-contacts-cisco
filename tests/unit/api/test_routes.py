@@ -12,14 +12,12 @@ This module tests all OAuth-related API endpoints:
 
 from unittest.mock import Mock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 from google.auth.exceptions import RefreshError
 
 from google_contacts_cisco.auth.oauth import (
     CredentialsNotConfiguredError,
     TokenExchangeError,
-    TokenRefreshError,
 )
 from google_contacts_cisco.main import app
 
@@ -96,7 +94,10 @@ class TestAuthGoogleEndpoint:
         with patch(
             "google_contacts_cisco.api.routes.get_authorization_url"
         ) as mock_get_url:
-            mock_get_url.return_value = ("https://accounts.google.com/auth", "/dashboard")
+            mock_get_url.return_value = (
+                "https://accounts.google.com/auth",
+                "/dashboard",
+            )
 
             response = client.get(
                 "/auth/google?redirect_uri=/dashboard", follow_redirects=False
@@ -155,7 +156,9 @@ class TestAuthCallbackEndpoint:
 
     def test_auth_callback_error_from_google(self):
         """Should return error HTML when Google returns error."""
-        response = client.get("/auth/callback?error=access_denied&error_description=User+denied")
+        response = client.get(
+            "/auth/callback?error=access_denied&error_description=User+denied"
+        )
 
         assert response.status_code == 400
         assert "Failed" in response.text
@@ -504,4 +507,3 @@ class TestOpenAPISchema:
         # Check that endpoints are tagged
         auth_google = schema["paths"]["/auth/google"]["get"]
         assert "authentication" in auth_google.get("tags", [])
-

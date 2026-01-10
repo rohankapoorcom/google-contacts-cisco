@@ -250,4 +250,3 @@ async def get_help(
     except Exception as e:
         logger.error("Error generating help: %s", e, exc_info=True)
         return _error_response("Error loading help")
-

@@ -27,7 +27,7 @@ def db_session():
     """Create in-memory database session for testing."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
+    SessionLocal = sessionmaker(bind=engine)  # noqa: N806
     session = SessionLocal()
     yield session
     session.close()
@@ -327,10 +327,7 @@ class TestSearchContactsCombined:
 
     def test_search_contacts_name_only_mode(self, search_service, sample_contacts):
         """Should exclude phone search when disabled."""
-        results = search_service.search_contacts(
-            "5551234",
-            include_phone_search=False
-        )
+        results = search_service.search_contacts("5551234", include_phone_search=False)
         assert len(results) == 0
 
     def test_search_contacts_loads_phone_numbers(self, search_service, sample_contacts):
@@ -339,7 +336,7 @@ class TestSearchContactsCombined:
         assert len(results) > 0
         # Check that phone numbers are loaded (no lazy loading)
         contact = results[0]
-        assert hasattr(contact, 'phone_numbers')
+        assert hasattr(contact, "phone_numbers")
         assert len(contact.phone_numbers) > 0
 
 
@@ -405,8 +402,7 @@ class TestCountSearchResults:
     def test_count_without_phone_search(self, search_service, sample_contacts):
         """Should count without phone search when disabled."""
         count = search_service.count_search_results(
-            "5551234",
-            include_phone_search=False
+            "5551234", include_phone_search=False
         )
         assert count == 0
 
@@ -584,9 +580,7 @@ class TestPhoneSearchSecurity:
         # Should treat as part of search, not SQL comment
         assert isinstance(results, list)
 
-    def test_phone_search_with_malicious_pattern(
-        self, search_service, sample_contacts
-    ):
+    def test_phone_search_with_malicious_pattern(self, search_service, sample_contacts):
         """Should handle malicious LIKE patterns safely."""
         # Try various SQL injection patterns
         malicious_patterns = [
@@ -594,7 +588,7 @@ class TestPhoneSearchSecurity:
             "1' OR '1'='1",
             "%\\'%",
             "___________",  # Try to match by length
-            "%%%%%%%%",     # Try to match everything
+            "%%%%%%%%",  # Try to match everything
         ]
 
         for pattern in malicious_patterns:

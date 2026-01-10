@@ -9,7 +9,6 @@ This module tests all Google client functionality including:
 - Error handling for various API errors
 """
 
-import time
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -98,9 +97,7 @@ class TestGoogleContactsClientInit:
     def test_init_loads_credentials_when_none_provided(self, monkeypatch):
         """Should load credentials from storage when none provided."""
         mock_creds = _create_mock_credentials()
-        monkeypatch.setattr(
-            google_client_module, "get_credentials", lambda: mock_creds
-        )
+        monkeypatch.setattr(google_client_module, "get_credentials", lambda: mock_creds)
 
         with patch.object(google_client_module, "build"):
             client = GoogleContactsClient()
@@ -176,9 +173,7 @@ class TestGoogleContactsClientService:
             client = GoogleContactsClient(mock_creds)
             _ = client.service
 
-            mock_build.assert_called_once_with(
-                "people", "v1", credentials=mock_creds
-            )
+            mock_build.assert_called_once_with("people", "v1", credentials=mock_creds)
 
     def test_service_returns_same_instance(self):
         """Should return same service instance on repeated access."""
@@ -213,9 +208,7 @@ class TestListConnections:
         }
         mock_service.people().connections().list().execute.return_value = mock_response
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             results = list(client.list_connections(page_size=100))
 
@@ -243,9 +236,7 @@ class TestListConnections:
             page2,
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):  # Skip sleep in tests
                 client = GoogleContactsClient(mock_creds)
                 results = list(client.list_connections(page_size=1))
@@ -265,9 +256,7 @@ class TestListConnections:
         }
         mock_service.people().connections().list().execute.return_value = mock_response
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             results = list(client.list_connections())
 
@@ -282,9 +271,7 @@ class TestListConnections:
         mock_response = {"connections": [], "nextSyncToken": "newsync"}
         mock_service.people().connections().list().execute.return_value = mock_response
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             list(client.list_connections(sync_token="oldsync"))
 
@@ -300,9 +287,7 @@ class TestListConnections:
         mock_response = {"connections": [], "nextSyncToken": "sync"}
         mock_service.people().connections().list().execute.return_value = mock_response
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             list(client.list_connections(page_size=2000))
 
@@ -321,9 +306,7 @@ class TestListConnections:
             error_response, b"Sync token expired"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
 
             with pytest.raises(SyncTokenExpiredError) as exc_info:
@@ -343,9 +326,7 @@ class TestListConnections:
             page2,
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep") as mock_sleep:
                 client = GoogleContactsClient(mock_creds)
                 list(client.list_connections())
@@ -368,9 +349,7 @@ class TestGetPerson:
         }
         mock_service.people().get().execute.return_value = person_data
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             result = client.get_person("people/12345")
 
@@ -388,9 +367,7 @@ class TestGetPerson:
             error_response, b"Not found"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
 
             with pytest.raises(HttpError):
@@ -409,9 +386,7 @@ class TestTestConnection:
             "connections": [{"resourceName": "people/1"}]
         }
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             result = client.test_connection()
 
@@ -426,9 +401,7 @@ class TestTestConnection:
             "connections": []
         }
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             result = client.test_connection()
 
@@ -445,9 +418,7 @@ class TestTestConnection:
             error_response, b"Forbidden"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
 
             with pytest.raises(HttpError):
@@ -467,9 +438,7 @@ class TestGetTotalConnectionsCount:
             "totalItems": 150,
         }
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             result = client.get_total_connections_count()
 
@@ -485,9 +454,7 @@ class TestGetTotalConnectionsCount:
             "totalPeople": 200,
         }
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             result = client.get_total_connections_count()
 
@@ -502,9 +469,7 @@ class TestGetTotalConnectionsCount:
             "connections": []
         }
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             client = GoogleContactsClient(mock_creds)
             result = client.get_total_connections_count()
 
@@ -528,9 +493,7 @@ class TestRetryLogic:
             {"connections": [], "nextSyncToken": "sync123"},
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):
                 client = GoogleContactsClient(mock_creds)
                 results = list(client.list_connections())
@@ -551,9 +514,7 @@ class TestRetryLogic:
             {"connections": []},
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):
                 client = GoogleContactsClient(mock_creds)
                 results = list(client.list_connections())
@@ -573,9 +534,7 @@ class TestRetryLogic:
             {"connections": []},
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):
                 client = GoogleContactsClient(mock_creds)
                 results = list(client.list_connections())
@@ -595,9 +554,7 @@ class TestRetryLogic:
             {"connections": []},
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):
                 client = GoogleContactsClient(mock_creds)
                 results = list(client.list_connections())
@@ -618,9 +575,7 @@ class TestRetryLogic:
             {"connections": []},
         ]
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep") as mock_sleep:
                 client = GoogleContactsClient(mock_creds, initial_backoff=1.0)
                 list(client.list_connections())
@@ -644,9 +599,7 @@ class TestRetryLogic:
             error_response, b"Rate limit"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):
                 client = GoogleContactsClient(mock_creds, max_retries=2)
 
@@ -667,9 +620,7 @@ class TestRetryLogic:
             error_response, b"Server error"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep"):
                 client = GoogleContactsClient(mock_creds, max_retries=2)
 
@@ -691,9 +642,7 @@ class TestRetryLogic:
             error_response, b"Unauthorized"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep") as mock_sleep:
                 client = GoogleContactsClient(mock_creds)
 
@@ -715,9 +664,7 @@ class TestRetryLogic:
             error_response, b"Forbidden"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep") as mock_sleep:
                 client = GoogleContactsClient(mock_creds)
 
@@ -738,9 +685,7 @@ class TestRetryLogic:
             error_response, b"Not found"
         )
 
-        with patch.object(
-            google_client_module, "build", return_value=mock_service
-        ):
+        with patch.object(google_client_module, "build", return_value=mock_service):
             with patch("time.sleep") as mock_sleep:
                 client = GoogleContactsClient(mock_creds)
 
@@ -756,9 +701,7 @@ class TestGetGoogleClient:
     def test_get_google_client_returns_client(self, monkeypatch):
         """Should return GoogleContactsClient instance."""
         mock_creds = _create_mock_credentials()
-        monkeypatch.setattr(
-            google_client_module, "get_credentials", lambda: mock_creds
-        )
+        monkeypatch.setattr(google_client_module, "get_credentials", lambda: mock_creds)
 
         with patch.object(google_client_module, "build"):
             client = get_google_client()
@@ -799,8 +742,9 @@ def _create_mock_service() -> MagicMock:
     """Create mock Google API service for testing."""
     service = MagicMock()
     # Set up the chain of method calls for people().connections().list()
-    service.people.return_value.connections.return_value.list.return_value.execute.return_value = {}
+    service.people.return_value.connections.return_value.list.return_value.execute.return_value = (  # noqa: E501
+        {}
+    )
     # Set up for people().get()
     service.people.return_value.get.return_value.execute.return_value = {}
     return service
-

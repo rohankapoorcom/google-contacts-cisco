@@ -1,9 +1,9 @@
 """Test configuration module.
 
-This module tests the Settings configuration class from Task 03: Configuration Management.
+This module tests the Settings configuration class from
+Task 03: Configuration Management.
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -312,19 +312,19 @@ class TestSettingsValidation:
 
     def test_timezone_invalid_fallback_to_utc(self):
         """Test invalid timezone falls back to UTC."""
-        import logging
         import io
-        
+        import logging
+
         log_stream = io.StringIO()
         handler = logging.StreamHandler(log_stream)
         handler.setLevel(logging.WARNING)
         logging.root.addHandler(handler)
         logging.root.setLevel(logging.WARNING)
-        
+
         try:
             settings = Settings(timezone="Invalid/Timezone")
             assert settings.timezone == "UTC"
-            
+
             # Verify the warning was logged
             log_output = log_stream.getvalue()
             assert "Invalid timezone" in log_output

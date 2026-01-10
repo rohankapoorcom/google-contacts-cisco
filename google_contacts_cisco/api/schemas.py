@@ -3,6 +3,7 @@
 This module provides schemas for parsing and validating data from Google People API
 responses and transforming them to internal formats.
 """
+
 from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
@@ -169,4 +170,3 @@ class GoogleConnectionsResponse(BaseModel):
     total_items: Optional[int] = Field(None, alias="totalItems")
 
     model_config = {"populate_by_name": True}
-

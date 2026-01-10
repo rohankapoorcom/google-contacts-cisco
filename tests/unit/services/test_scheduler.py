@@ -226,7 +226,8 @@ class TestSchedulerIntegration:
     def test_scheduler_runs_sync_periodically(
         self, mock_get_sync_service, mock_session_local
     ):
-        """Test scheduler runs sync immediately on startup and then at configured intervals."""
+        """Test scheduler runs sync immediately on startup and then at
+        configured intervals."""
         # This test uses a very short interval for testing
         # In real usage, intervals should be at least 5 minutes
 
@@ -261,14 +262,14 @@ class TestSchedulerIntegration:
             # Wait for initial sync to be called with a reasonable timeout
             sync_called = sync_called_event.wait(timeout=2.0)
             assert sync_called, "Scheduler did not call initial sync within timeout"
-            
+
             # Verify initial sync was called
-            assert sync_call_count[0] >= 1, "Initial sync should have been called immediately"
+            assert (
+                sync_call_count[0] >= 1
+            ), "Initial sync should have been called immediately"
         finally:
             scheduler.stop()
 
         # Verify sync was called at least once
         assert mock_sync_service.safe_auto_sync.called
         assert mock_db.close.called
-
-

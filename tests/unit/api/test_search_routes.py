@@ -57,7 +57,7 @@ def sample_contact():
 def sample_contacts():
     """Create multiple sample contacts for testing."""
     contacts = []
-    
+
     # Contact 1: John Doe
     contact1 = Contact(
         id=uuid.uuid4(),
@@ -79,7 +79,7 @@ def sample_contacts():
     )
     contact1.phone_numbers = [phone1]
     contacts.append(contact1)
-    
+
     # Contact 2: Jane Smith
     contact2 = Contact(
         id=uuid.uuid4(),
@@ -101,7 +101,7 @@ def sample_contacts():
     )
     contact2.phone_numbers = [phone2]
     contacts.append(contact2)
-    
+
     return contacts
 
 
@@ -195,7 +195,7 @@ class TestSearchContacts:
         """Should return 422 for invalid limit."""
         response = client.get("/api/contacts/search?q=test&limit=0")
         assert response.status_code == 422
-        
+
         response = client.get("/api/contacts/search?q=test&limit=101")
         assert response.status_code == 422
 
@@ -206,9 +206,7 @@ class TestSearchContacts:
 
     @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
-    def test_search_contacts_service_error(
-        self, mock_get_service, mock_get_db, client
-    ):
+    def test_search_contacts_service_error(self, mock_get_service, mock_get_db, client):
         """Should return 500 on service error."""
         # Setup mocks to raise exception
         mock_service = Mock()
@@ -396,7 +394,7 @@ class TestGetContact:
             deleted=True,  # Marked as deleted
         )
         deleted_contact.phone_numbers = []
-        
+
         mock_repo = Mock()
         mock_repo.get_by_id.return_value = deleted_contact
         mock_repo_class.return_value = mock_repo
@@ -471,9 +469,7 @@ class TestListContacts:
 
     @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
-    def test_list_contacts_empty_result(
-        self, mock_repo_class, mock_get_db, client
-    ):
+    def test_list_contacts_empty_result(self, mock_repo_class, mock_get_db, client):
         """Should handle empty contact list."""
         # Setup mocks
         mock_repo = Mock()
@@ -497,11 +493,11 @@ class TestListContacts:
         # Invalid limit
         response = client.get("/api/contacts?limit=0")
         assert response.status_code == 422
-        
+
         # Limit too high
         response = client.get("/api/contacts?limit=101")
         assert response.status_code == 422
-        
+
         # Negative offset
         response = client.get("/api/contacts?offset=-1")
         assert response.status_code == 422
@@ -530,7 +526,7 @@ class TestResponseModels:
         assert response.status_code == 200
         data = response.json()
         contact_data = data["results"][0]
-        
+
         # Check all required fields
         assert "id" in contact_data
         assert "resource_name" in contact_data
@@ -538,7 +534,7 @@ class TestResponseModels:
         assert "given_name" in contact_data
         assert "family_name" in contact_data
         assert "phone_numbers" in contact_data
-        
+
         # Check phone number format
         if contact_data["phone_numbers"]:
             phone = contact_data["phone_numbers"][0]
@@ -567,13 +563,13 @@ class TestResponseModels:
         # Assert
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "results" in data
         assert "total_count" in data
         assert "limit" in data
         assert "offset" in data
         assert "has_more" in data
-        
+
         assert data["total_count"] == 5
         assert data["limit"] == 2
         assert data["offset"] == 1
@@ -604,9 +600,7 @@ class TestErrorHandling:
 
     @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
-    def test_get_contact_repository_error(
-        self, mock_repo_class, mock_get_db, client
-    ):
+    def test_get_contact_repository_error(self, mock_repo_class, mock_get_db, client):
         """Should handle repository errors."""
         # Setup mock to raise exception
         mock_repo = Mock()

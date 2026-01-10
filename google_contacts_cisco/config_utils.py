@@ -96,4 +96,3 @@ def print_configuration_summary(config: Settings | None = None) -> None:
     print(f"  Redirect URI: {config.google_redirect_uri}")
     print(f"  Directory Title: {config.directory_title}")
     print(f"  Max Entries Per Page: {config.directory_max_entries_per_page}")
-

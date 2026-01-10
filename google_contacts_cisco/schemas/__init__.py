@@ -1,4 +1,5 @@
 """Pydantic schemas for the application."""
+
 from .contact import (
     ContactCreateSchema,
     ContactSchema,
@@ -12,4 +13,3 @@ __all__ = [
     "ContactSchema",
     "ContactSearchResultSchema",
 ]
-

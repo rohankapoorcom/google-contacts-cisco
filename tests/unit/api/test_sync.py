@@ -4,8 +4,9 @@ This module tests the FastAPI endpoints for contact synchronization.
 These are unit tests that mock the sync service to test the API layer in isolation.
 """
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from google_contacts_cisco.main import app
@@ -127,9 +128,7 @@ class TestFullSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_full_sync_already_in_progress(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_full_sync_already_in_progress(self, mock_get_service, mock_auth, client):
         """Test full sync fails when already in progress."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -170,9 +169,7 @@ class TestFullSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_full_sync_credentials_error(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_full_sync_credentials_error(self, mock_get_service, mock_auth, client):
         """Test full sync with credentials error."""
         from google_contacts_cisco.services.google_client import CredentialsError
 
@@ -190,9 +187,7 @@ class TestFullSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_full_sync_server_error(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_full_sync_server_error(self, mock_get_service, mock_auth, client):
         """Test full sync with unexpected error."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -314,9 +309,7 @@ class TestIncrementalSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_incremental_sync_server_error(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_incremental_sync_server_error(self, mock_get_service, mock_auth, client):
         """Test incremental sync with unexpected error."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -347,9 +340,7 @@ class TestAutoSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_auto_sync_already_in_progress(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_auto_sync_already_in_progress(self, mock_get_service, mock_auth, client):
         """Test auto sync fails when already in progress."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -364,9 +355,7 @@ class TestAutoSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_auto_sync_success_incremental(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_auto_sync_success_incremental(self, mock_get_service, mock_auth, client):
         """Test successful auto sync (incremental)."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -392,9 +381,7 @@ class TestAutoSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_auto_sync_success_full(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_auto_sync_success_full(self, mock_get_service, mock_auth, client):
         """Test successful auto sync (full)."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -419,9 +406,7 @@ class TestAutoSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_auto_sync_no_changes(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_auto_sync_no_changes(self, mock_get_service, mock_auth, client):
         """Test auto sync with no changes."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -445,9 +430,7 @@ class TestAutoSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_auto_sync_credentials_error(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_auto_sync_credentials_error(self, mock_get_service, mock_auth, client):
         """Test auto sync with credentials error."""
         from google_contacts_cisco.services.google_client import CredentialsError
 
@@ -465,9 +448,7 @@ class TestAutoSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_auto_sync_server_error(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_auto_sync_server_error(self, mock_get_service, mock_auth, client):
         """Test auto sync with unexpected error."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -579,9 +560,7 @@ class TestSafeSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_safe_sync_already_in_progress(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_safe_sync_already_in_progress(self, mock_get_service, mock_auth, client):
         """Test safe sync returns 409 when already in progress."""
         mock_auth.return_value = True
         mock_service = Mock()
@@ -601,9 +580,7 @@ class TestSafeSyncEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_safe_sync_credentials_error(
-        self, mock_get_service, mock_auth, client
-    ):
+    def test_safe_sync_credentials_error(self, mock_get_service, mock_auth, client):
         """Test safe sync with credentials error."""
         from google_contacts_cisco.services.google_client import CredentialsError
 
@@ -835,9 +812,7 @@ class TestClearHistoryEndpoint:
 
     @patch("google_contacts_cisco.api.sync.is_authenticated")
     @patch("google_contacts_cisco.api.sync.get_sync_service")
-    def test_clear_history_empty(
-        self, mock_get_service, mock_is_authenticated, client
-    ):
+    def test_clear_history_empty(self, mock_get_service, mock_is_authenticated, client):
         """Test clearing empty history."""
         mock_is_authenticated.return_value = True
         mock_service = Mock()

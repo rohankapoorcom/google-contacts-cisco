@@ -87,9 +87,7 @@ class TestTestConnectionEndpoint:
     def test_test_connection_rate_limit_error(self, client):
         """Should return 429 on rate limit error."""
         mock_client = Mock()
-        mock_client.test_connection.side_effect = RateLimitError(
-            "Rate limit exceeded"
-        )
+        mock_client.test_connection.side_effect = RateLimitError("Rate limit exceeded")
 
         with patch.object(google_module, "is_authenticated", return_value=True):
             with patch.object(
@@ -148,4 +146,3 @@ class TestResponseModels:
         assert "status" in data
         assert "message" in data
         assert "total_contacts" in data
-
