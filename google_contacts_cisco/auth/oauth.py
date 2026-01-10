@@ -11,6 +11,7 @@ This module handles the complete OAuth 2.0 flow for Google authentication:
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Optional, cast
 
@@ -45,6 +46,25 @@ class TokenExchangeError(OAuthError):
 
 class TokenRefreshError(OAuthError):
     """Raised when token refresh fails."""
+
+    pass
+
+
+class PermanentTokenRefreshError(TokenRefreshError):
+    """Raised when token refresh fails permanently (e.g., revoked token).
+    
+    This indicates that the token cannot be recovered and the user
+    must re-authenticate.
+    """
+
+    pass
+
+
+class TransientTokenRefreshError(TokenRefreshError):
+    """Raised when token refresh fails temporarily (e.g., network error).
+    
+    This indicates that the refresh might succeed if retried.
+    """
 
     pass
 
@@ -101,11 +121,128 @@ def get_token_path() -> Path:
     return settings.token_path
 
 
+def _is_permanent_refresh_error(error: RefreshError) -> bool:
+    """Determine if a RefreshError is permanent or transient.
+    
+    Permanent errors indicate that the token cannot be recovered and
+    the user must re-authenticate. Transient errors may succeed if retried.
+    
+    Args:
+        error: The RefreshError to classify
+        
+    Returns:
+        True if the error is permanent, False if it's transient
+    """
+    error_str = str(error).lower()
+    error_description = getattr(error, "error_details", "").lower()
+    
+    # Permanent error indicators
+    permanent_indicators = [
+        "invalid_grant",  # Token revoked or expired refresh token
+        "invalid_client",  # Invalid client credentials
+        "unauthorized_client",  # Client not authorized
+        "revoked",  # Token explicitly revoked
+        "deleted",  # Refresh token deleted
+        "disabled",  # Account disabled
+        "malformed",  # Malformed request (likely bad credentials)
+    ]
+    
+    # Check if any permanent indicators are in the error message
+    for indicator in permanent_indicators:
+        if indicator in error_str or indicator in error_description:
+            return True
+    
+    # If we can't determine, treat as transient (safer - allows retry)
+    return False
+
+
+def _refresh_token_with_retry(
+    creds: Credentials,
+    max_retries: int = 3,
+    initial_backoff: float = 1.0,
+) -> tuple[bool, Optional[Exception]]:
+    """Attempt to refresh token with exponential backoff retry.
+    
+    Args:
+        creds: Credentials to refresh
+        max_retries: Maximum number of retry attempts
+        initial_backoff: Initial backoff delay in seconds
+        
+    Returns:
+        Tuple of (success: bool, error: Optional[Exception])
+    """
+    backoff = initial_backoff
+    last_error: Optional[Exception] = None
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(
+                "Attempting token refresh (attempt %d/%d)", attempt + 1, max_retries
+            )
+            creds.refresh(Request())
+            logger.info("Access token refreshed successfully")
+            return True, None
+            
+        except RefreshError as e:
+            last_error = e
+            
+            # Check if this is a permanent error
+            if _is_permanent_refresh_error(e):
+                logger.error("Permanent token refresh error: %s", e)
+                return False, e
+            
+            # Transient error - retry if we have attempts left
+            if attempt < max_retries - 1:
+                logger.warning(
+                    "Transient token refresh error (attempt %d/%d): %s. "
+                    "Retrying in %.1f seconds...",
+                    attempt + 1,
+                    max_retries,
+                    e,
+                    backoff,
+                )
+                time.sleep(backoff)
+                backoff *= 2  # Exponential backoff
+            else:
+                logger.error(
+                    "Token refresh failed after %d attempts: %s", max_retries, e
+                )
+                return False, e
+                
+        except Exception as e:
+            # Unexpected errors are treated as transient
+            last_error = e
+            
+            if attempt < max_retries - 1:
+                logger.warning(
+                    "Unexpected error during token refresh (attempt %d/%d): %s. "
+                    "Retrying in %.1f seconds...",
+                    attempt + 1,
+                    max_retries,
+                    e,
+                    backoff,
+                )
+                time.sleep(backoff)
+                backoff *= 2
+            else:
+                logger.error(
+                    "Token refresh failed after %d attempts: %s", max_retries, e
+                )
+                return False, e
+    
+    return False, last_error
+
+
 def get_credentials() -> Optional[Credentials]:
     """Get stored credentials or None if not authenticated.
 
     This function attempts to load credentials from the token file,
-    and will automatically refresh them if expired.
+    and will automatically refresh them if expired. It distinguishes
+    between permanent failures (e.g., revoked token) and transient
+    failures (e.g., network issues) and handles them appropriately.
+
+    For permanent failures, the token file is deleted to prevent
+    the user from being stuck in an auth limbo state.
 
     Returns:
         Credentials if authenticated and valid, None otherwise
@@ -120,26 +257,48 @@ def get_credentials() -> Optional[Credentials]:
         creds = Credentials.from_authorized_user_file(str(token_path), get_scopes())
     except Exception as e:
         logger.error("Error loading credentials from %s: %s", token_path, e)
+        # If we can't load the file, it may be corrupted - delete it
+        logger.info("Deleting corrupted token file")
+        delete_token_file()
         return None
 
     # Check if credentials are valid
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            # Try to refresh
-            try:
-                logger.info("Refreshing expired access token")
-                creds.refresh(Request())
+            # Try to refresh with retry logic
+            success, error = _refresh_token_with_retry(creds)
+            
+            if success:
+                # Save the refreshed credentials
                 save_credentials(creds)
-                logger.info("Access token refreshed successfully")
                 return cast(Credentials, creds)
-            except RefreshError as e:
-                logger.error("Error refreshing token: %s", e)
-                return None
-            except Exception as e:
-                logger.error("Unexpected error during token refresh: %s", e)
-                return None
+            
+            # Refresh failed - check if it's permanent
+            if error and isinstance(error, RefreshError):
+                if _is_permanent_refresh_error(error):
+                    logger.error(
+                        "Permanent token refresh failure. Deleting token file. "
+                        "User must re-authenticate."
+                    )
+                    delete_token_file()
+                else:
+                    logger.error(
+                        "Token refresh failed after retries. "
+                        "This may be a transient issue. User should try again later."
+                    )
+            else:
+                logger.error(
+                    "Token refresh failed with unexpected error. "
+                    "User may need to re-authenticate."
+                )
+            
+            return None
         else:
             logger.debug("Credentials invalid and cannot be refreshed")
+            # If credentials are invalid and can't be refreshed, delete the token
+            if creds and not creds.refresh_token:
+                logger.info("No refresh token available. Deleting token file.")
+                delete_token_file()
             return None
 
     return cast(Credentials, creds)

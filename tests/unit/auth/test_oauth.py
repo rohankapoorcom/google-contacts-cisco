@@ -24,8 +24,10 @@ from google_contacts_cisco.auth import oauth
 from google_contacts_cisco.auth.oauth import (
     CredentialsNotConfiguredError,
     OAuthError,
+    PermanentTokenRefreshError,
     TokenExchangeError,
     TokenRefreshError,
+    TransientTokenRefreshError,
     credentials_to_dict,
     delete_token_file,
     get_auth_status,
@@ -67,6 +69,20 @@ class TestExceptions:
         error = TokenRefreshError("refresh failed")
         assert isinstance(error, OAuthError)
         assert str(error) == "refresh failed"
+
+    def test_permanent_token_refresh_error(self):
+        """PermanentTokenRefreshError should inherit from TokenRefreshError."""
+        error = PermanentTokenRefreshError("token revoked")
+        assert isinstance(error, TokenRefreshError)
+        assert isinstance(error, OAuthError)
+        assert str(error) == "token revoked"
+
+    def test_transient_token_refresh_error(self):
+        """TransientTokenRefreshError should inherit from TokenRefreshError."""
+        error = TransientTokenRefreshError("network timeout")
+        assert isinstance(error, TokenRefreshError)
+        assert isinstance(error, OAuthError)
+        assert str(error) == "network timeout"
 
 
 class TestGetScopes:
@@ -789,4 +805,327 @@ def _create_mock_credentials() -> Credentials:
         client_secret="test_client_secret",
         scopes=["https://www.googleapis.com/auth/contacts.readonly"],
     )
+
+
+class TestIsPermanentRefreshError:
+    """Test _is_permanent_refresh_error helper function."""
+
+    def test_invalid_grant_is_permanent(self):
+        """Should identify invalid_grant as permanent error."""
+        from google_contacts_cisco.auth.oauth import _is_permanent_refresh_error
+
+        error = RefreshError("invalid_grant: Token has been expired or revoked")
+        assert _is_permanent_refresh_error(error) is True
+
+    def test_revoked_token_is_permanent(self):
+        """Should identify revoked token as permanent error."""
+        from google_contacts_cisco.auth.oauth import _is_permanent_refresh_error
+
+        error = RefreshError("Token has been revoked")
+        assert _is_permanent_refresh_error(error) is True
+
+    def test_invalid_client_is_permanent(self):
+        """Should identify invalid_client as permanent error."""
+        from google_contacts_cisco.auth.oauth import _is_permanent_refresh_error
+
+        error = RefreshError("invalid_client: Unauthorized")
+        assert _is_permanent_refresh_error(error) is True
+
+    def test_network_error_is_transient(self):
+        """Should identify network errors as transient."""
+        from google_contacts_cisco.auth.oauth import _is_permanent_refresh_error
+
+        error = RefreshError("Connection timeout")
+        assert _is_permanent_refresh_error(error) is False
+
+    def test_rate_limit_is_transient(self):
+        """Should identify rate limit as transient."""
+        from google_contacts_cisco.auth.oauth import _is_permanent_refresh_error
+
+        error = RefreshError("Rate limit exceeded")
+        assert _is_permanent_refresh_error(error) is False
+
+    def test_unknown_error_is_transient(self):
+        """Unknown errors should be treated as transient (safer to retry)."""
+        from google_contacts_cisco.auth.oauth import _is_permanent_refresh_error
+
+        error = RefreshError("Something went wrong")
+        assert _is_permanent_refresh_error(error) is False
+
+
+class TestRefreshTokenWithRetry:
+    """Test _refresh_token_with_retry helper function."""
+
+    def test_successful_refresh_first_attempt(self, monkeypatch):
+        """Should succeed on first attempt without retry."""
+        from google_contacts_cisco.auth.oauth import _refresh_token_with_retry
+
+        mock_creds = Mock(spec=Credentials)
+        mock_creds.refresh = Mock()
+
+        success, error = _refresh_token_with_retry(mock_creds, max_retries=3)
+
+        assert success is True
+        assert error is None
+        mock_creds.refresh.assert_called_once()
+
+    def test_permanent_error_no_retry(self, monkeypatch):
+        """Should not retry on permanent errors."""
+        from google_contacts_cisco.auth.oauth import _refresh_token_with_retry
+
+        mock_creds = Mock(spec=Credentials)
+        permanent_error = RefreshError("invalid_grant: Token revoked")
+        mock_creds.refresh = Mock(side_effect=permanent_error)
+
+        success, error = _refresh_token_with_retry(mock_creds, max_retries=3)
+
+        assert success is False
+        assert error is permanent_error
+        # Should only call once for permanent errors
+        mock_creds.refresh.assert_called_once()
+
+    def test_transient_error_with_retry_success(self, monkeypatch):
+        """Should retry transient errors and eventually succeed."""
+        from google_contacts_cisco.auth.oauth import _refresh_token_with_retry
+
+        mock_creds = Mock(spec=Credentials)
+        # Fail twice, then succeed
+        mock_creds.refresh = Mock(
+            side_effect=[
+                RefreshError("Network timeout"),
+                RefreshError("Connection error"),
+                None,  # Success on third attempt
+            ]
+        )
+
+        success, error = _refresh_token_with_retry(
+            mock_creds, max_retries=3, initial_backoff=0.01
+        )
+
+        assert success is True
+        assert error is None
+        assert mock_creds.refresh.call_count == 3
+
+    def test_transient_error_exhausts_retries(self, monkeypatch):
+        """Should fail after exhausting all retries."""
+        from google_contacts_cisco.auth.oauth import _refresh_token_with_retry
+
+        mock_creds = Mock(spec=Credentials)
+        transient_error = RefreshError("Network timeout")
+        mock_creds.refresh = Mock(side_effect=transient_error)
+
+        success, error = _refresh_token_with_retry(
+            mock_creds, max_retries=3, initial_backoff=0.01
+        )
+
+        assert success is False
+        assert error is transient_error
+        assert mock_creds.refresh.call_count == 3
+
+    def test_unexpected_error_with_retry(self, monkeypatch):
+        """Should retry unexpected errors."""
+        from google_contacts_cisco.auth.oauth import _refresh_token_with_retry
+
+        mock_creds = Mock(spec=Credentials)
+        # Fail with unexpected error, then succeed
+        mock_creds.refresh = Mock(
+            side_effect=[
+                Exception("Unexpected error"),
+                None,  # Success
+            ]
+        )
+
+        success, error = _refresh_token_with_retry(
+            mock_creds, max_retries=3, initial_backoff=0.01
+        )
+
+        assert success is True
+        assert error is None
+        assert mock_creds.refresh.call_count == 2
+
+
+class TestGetCredentialsWithEnhancedRefresh:
+    """Test enhanced get_credentials with retry and error handling."""
+
+    def test_get_credentials_permanent_error_deletes_token(
+        self, tmp_path, monkeypatch
+    ):
+        """Should delete token file on permanent refresh errors."""
+        token_path = tmp_path / "token.json"
+        mock_settings = Mock()
+        mock_settings.token_path = token_path
+        mock_settings.google_oauth_scopes = [
+            "https://www.googleapis.com/auth/contacts.readonly"
+        ]
+        monkeypatch.setattr(oauth, "settings", mock_settings)
+
+        # Write a token file
+        token_data = {
+            "token": "expired_token",
+            "refresh_token": "test_refresh_token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": "test_client_id",
+            "client_secret": "test_client_secret",
+        }
+        token_path.write_text(json.dumps(token_data))
+
+        # Mock credentials that fail with permanent error
+        mock_creds = Mock(spec=Credentials)
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = "test_refresh_token"
+        mock_creds.refresh.side_effect = RefreshError("invalid_grant: Token revoked")
+
+        with patch(
+            "google_contacts_cisco.auth.oauth.Credentials.from_authorized_user_file",
+            return_value=mock_creds,
+        ):
+            result = get_credentials()
+
+        assert result is None
+        # Token file should be deleted
+        assert not token_path.exists()
+
+    def test_get_credentials_transient_error_keeps_token(self, tmp_path, monkeypatch):
+        """Should keep token file on transient refresh errors."""
+        token_path = tmp_path / "token.json"
+        mock_settings = Mock()
+        mock_settings.token_path = token_path
+        mock_settings.google_oauth_scopes = [
+            "https://www.googleapis.com/auth/contacts.readonly"
+        ]
+        monkeypatch.setattr(oauth, "settings", mock_settings)
+
+        # Write a token file
+        token_data = {
+            "token": "expired_token",
+            "refresh_token": "test_refresh_token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": "test_client_id",
+            "client_secret": "test_client_secret",
+        }
+        token_path.write_text(json.dumps(token_data))
+
+        # Mock credentials that fail with transient error
+        mock_creds = Mock(spec=Credentials)
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = "test_refresh_token"
+        mock_creds.refresh.side_effect = RefreshError("Network timeout")
+
+        with patch(
+            "google_contacts_cisco.auth.oauth.Credentials.from_authorized_user_file",
+            return_value=mock_creds,
+        ):
+            result = get_credentials()
+
+        assert result is None
+        # Token file should still exist (transient error)
+        assert token_path.exists()
+
+    def test_get_credentials_retry_succeeds(self, tmp_path, monkeypatch):
+        """Should succeed after retrying transient errors."""
+        token_path = tmp_path / "token.json"
+        mock_settings = Mock()
+        mock_settings.token_path = token_path
+        mock_settings.google_oauth_scopes = [
+            "https://www.googleapis.com/auth/contacts.readonly"
+        ]
+        monkeypatch.setattr(oauth, "settings", mock_settings)
+
+        # Write a token file
+        token_data = {
+            "token": "expired_token",
+            "refresh_token": "test_refresh_token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": "test_client_id",
+            "client_secret": "test_client_secret",
+        }
+        token_path.write_text(json.dumps(token_data))
+
+        # Mock credentials that fail once then succeed
+        mock_creds = Mock(spec=Credentials)
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = "test_refresh_token"
+        mock_creds.token = "new_access_token"
+        mock_creds.to_json.return_value = json.dumps(token_data)
+
+        call_count = 0
+
+        def refresh_side_effect(request):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RefreshError("Network timeout")
+            # Success on second attempt
+            mock_creds.valid = True
+
+        mock_creds.refresh.side_effect = refresh_side_effect
+
+        with patch(
+            "google_contacts_cisco.auth.oauth.Credentials.from_authorized_user_file",
+            return_value=mock_creds,
+        ):
+            result = get_credentials()
+
+        assert result is not None
+        assert mock_creds.refresh.call_count == 2
+
+    def test_get_credentials_corrupted_file_deletes_token(
+        self, tmp_path, monkeypatch
+    ):
+        """Should delete corrupted token files."""
+        token_path = tmp_path / "token.json"
+        token_path.write_text("corrupted json content")
+        mock_settings = Mock()
+        mock_settings.token_path = token_path
+        mock_settings.google_oauth_scopes = [
+            "https://www.googleapis.com/auth/contacts.readonly"
+        ]
+        monkeypatch.setattr(oauth, "settings", mock_settings)
+
+        result = get_credentials()
+
+        assert result is None
+        # Corrupted file should be deleted
+        assert not token_path.exists()
+
+    def test_get_credentials_no_refresh_token_deletes_file(
+        self, tmp_path, monkeypatch
+    ):
+        """Should delete token file when credentials can't be refreshed."""
+        token_path = tmp_path / "token.json"
+        mock_settings = Mock()
+        mock_settings.token_path = token_path
+        mock_settings.google_oauth_scopes = [
+            "https://www.googleapis.com/auth/contacts.readonly"
+        ]
+        monkeypatch.setattr(oauth, "settings", mock_settings)
+
+        # Write a token file without refresh token
+        token_data = {
+            "token": "expired_token",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "client_id": "test_client_id",
+            "client_secret": "test_client_secret",
+        }
+        token_path.write_text(json.dumps(token_data))
+
+        # Mock expired credentials without refresh token
+        mock_creds = Mock(spec=Credentials)
+        mock_creds.valid = False
+        mock_creds.expired = True
+        mock_creds.refresh_token = None
+
+        with patch(
+            "google_contacts_cisco.auth.oauth.Credentials.from_authorized_user_file",
+            return_value=mock_creds,
+        ):
+            result = get_credentials()
+
+        assert result is None
+        # Token file should be deleted
+        assert not token_path.exists()
+
 
