@@ -182,6 +182,20 @@ class TestGetLogger:
         format_str = handler.formatter._fmt
         assert format_str == DEFAULT_LOG_FORMAT
 
+    def test_get_logger_does_not_propagate(self, monkeypatch):
+        """Logger should not propagate to root logger to prevent duplicate log entries."""
+        mock_settings = Mock()
+        mock_settings.log_level = "INFO"
+        monkeypatch.setattr(logger_module, "settings", mock_settings)
+
+        test_logger = logging.getLogger("test_module_propagate")
+        test_logger.handlers.clear()
+
+        result = get_logger("test_module_propagate")
+
+        # Verify propagate is set to False to prevent duplicate log entries
+        assert result.propagate is False
+
 
 class TestConfigureRootLogger:
     """Test configure_root_logger function."""
@@ -295,4 +309,37 @@ class TestLoggerIntegration:
         captured = capsys.readouterr()
         assert "Warning message" in captured.out
         assert "Error message" in captured.out
+
+    def test_logger_no_duplicate_entries_with_root_logger(self, monkeypatch, capsys):
+        """Logger should not produce duplicate entries when root logger is configured."""
+        mock_settings = Mock()
+        mock_settings.log_level = "INFO"
+        monkeypatch.setattr(logger_module, "settings", mock_settings)
+
+        # Configure root logger (simulating what main.py does)
+        logging.basicConfig(
+            level=logging.INFO,
+            format=DEFAULT_LOG_FORMAT,
+            handlers=[logging.StreamHandler(sys.stdout)],
+            force=True,  # Force reconfiguration for testing
+        )
+
+        # Get a fresh logger
+        test_logger = logging.getLogger("test_no_duplicates")
+        test_logger.handlers.clear()
+        test_logger.propagate = True  # Reset to default
+
+        # Get logger through our utility
+        log = get_logger("test_no_duplicates")
+        
+        # Log a unique message
+        unique_message = "Unique test message for duplicate check"
+        log.info(unique_message)
+
+        # Capture output
+        captured = capsys.readouterr()
+        
+        # Count occurrences - should be exactly 1, not 2
+        occurrences = captured.out.count(unique_message)
+        assert occurrences == 1, f"Expected 1 occurrence of log message, found {occurrences}"
 
