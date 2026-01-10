@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..models import get_db
 from ..repositories.contact_repository import ContactRepository
+from ..schemas.contact import ContactListResponse, ContactResponse as SchemaContactResponse
 from ..services.search_service import get_search_service
 from ..utils.logger import get_logger
 
@@ -390,7 +391,7 @@ async def get_contact(
         ) from e
 
 
-@router.get("", response_model=SearchResponse)
+@router.get("", response_model=ContactListResponse)
 async def list_contacts(
     limit: int = Query(
         50,
@@ -404,7 +405,7 @@ async def list_contacts(
         ge=0,
     ),
     db: Session = Depends(get_db),
-) -> SearchResponse:
+) -> ContactListResponse:
     """List all contacts (paginated).
 
     Returns all non-deleted contacts in alphabetical order by display name.
@@ -415,7 +416,7 @@ async def list_contacts(
         db: Database session (injected)
 
     Returns:
-        SearchResponse with contacts and pagination info
+        ContactListResponse with contacts and pagination info
 
     Raises:
         HTTPException: If listing fails
@@ -431,25 +432,25 @@ async def list_contacts(
         )
 
         # Get total count
-        total_count = repository.count_contacts()
+        total = repository.count_contacts()
 
-        # Convert to response models
+        # Convert to response models using the schema's from_orm method
         contact_responses = [
-            ContactResponse.model_validate(contact) for contact in contacts
+            SchemaContactResponse.from_orm(contact) for contact in contacts
         ]
 
         logger.info(
             "Listed contacts: returned=%d, total=%d",
             len(contact_responses),
-            total_count,
+            total,
         )
 
-        return SearchResponse(
-            results=contact_responses,
-            total_count=total_count,
+        return ContactListResponse(
+            contacts=contact_responses,
+            total=total,
             limit=limit,
             offset=offset,
-            has_more=(offset + len(contact_responses)) < total_count,
+            has_more=(offset + len(contact_responses)) < total,
         )
 
     except Exception as e:

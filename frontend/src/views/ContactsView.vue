@@ -55,9 +55,9 @@ const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('')
 const displayedContacts = computed(() => {
   if (isSearchMode.value) {
     // In search mode, show search results (SearchResult has same structure as Contact)
-    return searchResults.value as Contact[]
+    return (searchResults.value || []) as Contact[]
   }
-  return contacts.value
+  return contacts.value || []
 })
 
 const totalPages = computed(() => {
@@ -104,12 +104,16 @@ async function loadContacts() {
     }
     
     const response = await api.getContacts(params)
-    contacts.value = response.contacts
-    totalContacts.value = response.total
-    hasMore.value = response.has_more
+    contacts.value = response?.contacts || []
+    totalContacts.value = response?.total || 0
+    hasMore.value = response?.has_more || false
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Failed to load contacts'
     console.error('Error loading contacts:', err)
+    // Ensure contacts is always an array even on error
+    contacts.value = []
+    totalContacts.value = 0
+    hasMore.value = false
   } finally {
     isLoading.value = false
   }
@@ -129,10 +133,12 @@ async function performSearch(query: string) {
   
   try {
     const response = await api.search(query, 100) // Get up to 100 search results
-    searchResults.value = response.results
+    searchResults.value = response?.results || []
   } catch (err: any) {
     error.value = err.response?.data?.detail || 'Search failed'
     console.error('Error searching contacts:', err)
+    // Ensure searchResults is always an array even on error
+    searchResults.value = []
   } finally {
     isLoading.value = false
   }
@@ -284,7 +290,7 @@ watch(viewMode, () => {
         </button>
       </div>
       <div v-else class="text-sm text-slate-600">
-        Search mode: {{ searchResults.length }} result(s)
+        Search mode: {{ (searchResults || []).length }} result(s)
       </div>
 
       <!-- Right Controls -->
