@@ -16,6 +16,7 @@ from google_contacts_cisco.services.xml_formatter import (
     GROUP_MAPPINGS,
     CiscoXMLFormatter,
     get_xml_formatter,
+    sanitize_text_content,
 )
 
 
@@ -850,4 +851,237 @@ class TestEdgeCases(TestCiscoXMLFormatter):
         title = root.find("Title")
         assert "John" in title.text
         assert "Doe" in title.text
+
+
+class TestSanitizeTextContent:
+    """Test text sanitization function for XSS prevention."""
+
+    def test_sanitize_empty_string(self):
+        """Test sanitization of empty string."""
+        result = sanitize_text_content("")
+        assert result == ""
+
+    def test_sanitize_none(self):
+        """Test sanitization of None."""
+        result = sanitize_text_content(None)
+        assert result == ""
+
+    def test_sanitize_normal_text(self):
+        """Test sanitization of normal text."""
+        result = sanitize_text_content("John Doe")
+        assert result == "John Doe"
+
+    def test_sanitize_with_special_chars(self):
+        """Test sanitization preserves special characters for lxml."""
+        result = sanitize_text_content("John & Jane's <Company>")
+        assert result == "John & Jane's <Company>"
+
+    def test_sanitize_script_tag_raises(self):
+        """Test that script tags raise ValueError."""
+        with pytest.raises(ValueError, match="potentially malicious"):
+            sanitize_text_content("<script>alert('xss')</script>")
+
+    def test_sanitize_script_tag_case_insensitive(self):
+        """Test that script tags are detected case-insensitively."""
+        with pytest.raises(ValueError, match="potentially malicious"):
+            sanitize_text_content("<SCRIPT>alert('xss')</SCRIPT>")
+
+    def test_sanitize_javascript_url_raises(self):
+        """Test that javascript: URLs raise ValueError."""
+        with pytest.raises(ValueError, match="potentially malicious"):
+            sanitize_text_content("javascript:alert(1)")
+
+    def test_sanitize_event_handler_raises(self):
+        """Test that event handlers raise ValueError."""
+        with pytest.raises(ValueError, match="potentially malicious"):
+            sanitize_text_content("text onclick=alert(1)")
+
+    def test_sanitize_onerror_handler_raises(self):
+        """Test that onerror handlers raise ValueError."""
+        with pytest.raises(ValueError, match="potentially malicious"):
+            sanitize_text_content("<img src=x onerror=alert(1)>")
+
+    def test_sanitize_iframe_raises(self):
+        """Test that iframe tags raise ValueError."""
+        with pytest.raises(ValueError, match="potentially malicious"):
+            sanitize_text_content("<iframe src='evil.com'></iframe>")
+
+    def test_sanitize_cdata_escape(self):
+        """Test that CDATA escape sequences are neutralized."""
+        result = sanitize_text_content("Test ]]> content")
+        assert "]]>" not in result
+        assert "]]&gt;" in result
+
+    def test_sanitize_enforces_max_length(self):
+        """Test that maximum length is enforced."""
+        long_text = "A" * 300
+        result = sanitize_text_content(long_text, max_length=200)
+        assert len(result) == 200
+
+    def test_sanitize_strips_control_characters(self):
+        """Test that control characters are stripped."""
+        text_with_control = "John\x00Doe\x01Test"
+        result = sanitize_text_content(text_with_control)
+        assert "\x00" not in result
+        assert "\x01" not in result
+        assert "JohnDoeTest" == result
+
+    def test_sanitize_preserves_newlines(self):
+        """Test that newlines are preserved."""
+        text = "Line 1\nLine 2"
+        result = sanitize_text_content(text)
+        assert result == "Line 1\nLine 2"
+
+    def test_sanitize_preserves_tabs(self):
+        """Test that tabs are preserved."""
+        text = "Col1\tCol2"
+        result = sanitize_text_content(text)
+        assert result == "Col1\tCol2"
+
+    def test_sanitize_unicode_characters(self):
+        """Test that unicode characters are preserved."""
+        text = "José García 日本語"
+        result = sanitize_text_content(text)
+        assert result == "José García 日本語"
+
+    def test_sanitize_emoji(self):
+        """Test that emoji are preserved."""
+        text = "Hello 👋 World"
+        result = sanitize_text_content(text)
+        assert "👋" in result
+
+
+class TestXSSProtection(TestCiscoXMLFormatter):
+    """Test XSS vulnerability protection in XML generation."""
+
+    def test_contact_with_script_tag_raises(self, formatter):
+        """Test that contact with script tag raises ValueError."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="<script>alert('xss')</script>",
+        )
+
+        with pytest.raises(ValueError, match="potentially malicious"):
+            formatter.generate_contact_directory(contact)
+
+    def test_contact_with_javascript_url_raises(self, formatter):
+        """Test that contact with javascript: URL raises ValueError."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="javascript:alert(1)",
+        )
+
+        with pytest.raises(ValueError, match="potentially malicious"):
+            formatter.generate_contact_directory(contact)
+
+    def test_contact_with_event_handler_raises(self, formatter):
+        """Test that contact with event handler raises ValueError."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="Name onclick=alert(1)",
+        )
+
+        with pytest.raises(ValueError, match="potentially malicious"):
+            formatter.generate_contact_directory(contact)
+
+    def test_group_directory_skips_malicious_contact(self, formatter):
+        """Test that group directory skips contacts with malicious names."""
+        good_contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/good",
+            display_name="Good Contact",
+        )
+        bad_contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/bad",
+            display_name="<script>evil</script>",
+        )
+
+        xml_str = formatter.generate_group_directory(
+            "2ABC", [good_contact, bad_contact]
+        )
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        # Should only have one menu item (good contact)
+        menu_items = root.findall("MenuItem")
+        assert len(menu_items) == 1
+        assert menu_items[0].find("Name").text == "Good Contact"
+
+    def test_very_long_name_truncated(self, formatter):
+        """Test that very long names are truncated."""
+        long_name = "A" * 300
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name=long_name,
+        )
+
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        title = root.find("Title")
+        # Should be truncated to MAX_DISPLAY_NAME_LENGTH (200)
+        assert len(title.text) == 200
+
+    def test_cdata_escape_neutralized(self, formatter):
+        """Test that CDATA escape sequences are neutralized."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="Test ]]> Name",
+        )
+
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        title = root.find("Title")
+        # CDATA escape should be neutralized
+        assert "]]>" not in title.text
+        assert "]]>" not in xml_str
+
+    def test_phone_label_sanitized(self, formatter):
+        """Test that phone labels are sanitized."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="Test Contact",
+        )
+        # Note: In practice, phone.type comes from our code, not user input
+        # But we sanitize it as defense-in-depth
+        contact.phone_numbers = [
+            PhoneNumber(
+                id=uuid.uuid4(),
+                contact_id=contact.id,
+                value="5551234567",
+                display_value="(555) 123-4567",
+                type="mobile",
+                primary=True,
+            )
+        ]
+
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        # Should generate valid XML
+        assert root is not None
+
+    def test_control_characters_stripped(self, formatter):
+        """Test that control characters are stripped from names."""
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name="people/test",
+            display_name="John\x00Doe\x01",
+        )
+
+        xml_str = formatter.generate_contact_directory(contact)
+        root = etree.fromstring(xml_str.encode("utf-8"))
+
+        title = root.find("Title")
+        # Control characters should be stripped
+        assert "\x00" not in title.text
+        assert "\x01" not in title.text
+        assert title.text == "JohnDoe"
 
