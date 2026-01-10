@@ -48,6 +48,7 @@ def get_db():
 # Import models to register them with Base
 from .contact import Contact  # noqa: E402
 from .phone_number import PhoneNumber  # noqa: E402
+from .email_address import EmailAddress  # noqa: E402
 from .sync_state import SyncState, SyncStatus  # noqa: E402
 
-__all__ = ["Base", "engine", "SessionLocal", "get_db", "Contact", "PhoneNumber", "SyncState", "SyncStatus"]
+__all__ = ["Base", "engine", "SessionLocal", "get_db", "Contact", "PhoneNumber", "EmailAddress", "SyncState", "SyncStatus"]

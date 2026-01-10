@@ -448,7 +448,7 @@ class ContactRepository:
             - total_phone_numbers: Total phone number records
             - total_emails: Total email records
         """
-        from ..models.contact import EmailAddress
+        from ..models.email_address import EmailAddress
 
         total_contacts = self.count_contacts()
 
