@@ -1,5 +1,8 @@
 # Google Contacts to Cisco IP Phone
 
+[![CI - Tests and Linting](https://github.com/rohankapoorcom/google-contacts-cisco/actions/workflows/ci.yml/badge.svg)](https://github.com/rohankapoorcom/google-contacts-cisco/actions/workflows/ci.yml)
+[![Docker Build](https://github.com/rohankapoorcom/google-contacts-cisco/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/rohankapoorcom/google-contacts-cisco/actions/workflows/docker-publish.yml)
+
 A comprehensive web application that synchronizes Google Contacts and serves them to Cisco IP Phones via XML directory service, with a modern web interface for management.
 
 ## Features
@@ -115,6 +118,18 @@ For detailed API documentation, visit:
 - **Full API Guide**: [docs/api.md](docs/api.md)
 
 ## Development Setup
+
+### CI/CD
+
+All code changes are automatically validated through GitHub Actions:
+
+- ✅ **Automated Testing**: Tests run on Python 3.10, 3.11, 3.12, and 3.13
+- ✅ **Code Quality**: Ruff linting, Black formatting, and Mypy type checking
+- ✅ **Coverage Enforcement**: 80% minimum test coverage required
+- ✅ **Daily Builds**: Scheduled runs to catch dependency issues
+- ✅ **PR Checks**: All quality gates must pass before merging
+
+See [Testing Guide](docs/testing.md#cicd-pipeline) for details on the CI/CD pipeline.
 
 ### Using Dev Container (Recommended)
 
