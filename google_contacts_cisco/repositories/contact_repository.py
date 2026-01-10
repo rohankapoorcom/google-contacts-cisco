@@ -193,6 +193,20 @@ class ContactRepository:
             .all()
         )
 
+    def get_all_active_with_phones(self) -> List[Contact]:
+        """Get all non-deleted contacts that have at least one phone number.
+
+        Returns:
+            List of active contacts with phone numbers
+        """
+        return (
+            self.db.query(Contact)
+            .join(PhoneNumber)
+            .filter(Contact.deleted == False)  # noqa: E712
+            .distinct()
+            .all()
+        )
+
     def get_all(self) -> List[Contact]:
         """Get all contacts including deleted.
 

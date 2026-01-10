@@ -138,8 +138,8 @@ async def get_group_directory(
         formatter = get_xml_formatter(base_url)
         contact_repo = ContactRepository(db)
 
-        # Get all active contacts
-        all_contacts = contact_repo.get_all_active()
+        # Get all active contacts with phone numbers
+        all_contacts = contact_repo.get_all_active_with_phones()
 
         # Filter contacts by group
         group_upper = group.upper()

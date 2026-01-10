@@ -334,6 +334,113 @@ class TestGetContacts:
 
         assert len(all_contacts) == 2
 
+    def test_get_all_active_with_phones(self, contact_repo, db_session):
+        """Test get_all_active_with_phones returns only contacts with phone numbers."""
+        # Create contact with phone
+        contact1 = ContactCreateSchema(
+            resource_name="people/withphone",
+            display_name="Has Phone",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15551234567",
+                    display_value="+1-555-123-4567",
+                    type="mobile",
+                    primary=True,
+                ),
+            ],
+            deleted=False,
+        )
+        contact_repo.create_contact(contact1)
+
+        # Create contact without phone
+        contact2 = ContactCreateSchema(
+            resource_name="people/nophone",
+            display_name="No Phone",
+            phone_numbers=[],
+            deleted=False,
+        )
+        contact_repo.create_contact(contact2)
+
+        # Create deleted contact with phone
+        contact3 = ContactCreateSchema(
+            resource_name="people/deleted",
+            display_name="Deleted With Phone",
+            phone_numbers=[
+                PhoneNumberSchema(
+                    value="+15559876543",
+                    display_value="+1-555-987-6543",
+                    type="work",
+                    primary=True,
+                ),
+            ],
+            deleted=True,
+        )
+        contact_repo.create_contact(contact3)
+        db_session.commit()
+
+        # Get contacts with phones
+        results = contact_repo.get_all_active_with_phones()
+
+        # Should only return contact1
+        assert len(results) == 1
+        assert results[0].display_name == "Has Phone"
+
+    def test_get_all_active_with_phones_empty(self, contact_repo, db_session):
+        """Test get_all_active_with_phones with no qualifying contacts."""
+        # Create contact without phone
+        contact = ContactCreateSchema(
+            resource_name="people/nophone",
+            display_name="No Phone",
+            phone_numbers=[],
+            deleted=False,
+        )
+        contact_repo.create_contact(contact)
+        db_session.commit()
+
+        results = contact_repo.get_all_active_with_phones()
+        assert len(results) == 0
+
+    def test_get_all_active_with_phones_multiple(self, contact_repo, db_session):
+        """Test get_all_active_with_phones returns multiple contacts correctly."""
+        # Create 3 contacts with phones
+        for i in range(3):
+            contact = ContactCreateSchema(
+                resource_name=f"people/contact{i}",
+                display_name=f"Contact {i}",
+                phone_numbers=[
+                    PhoneNumberSchema(
+                        value=f"+155512340{i}",
+                        display_value=f"+1-555-1234-0{i}",
+                        type="mobile",
+                        primary=True,
+                    ),
+                ],
+                deleted=False,
+            )
+            contact_repo.create_contact(contact)
+
+        # Create 2 contacts without phones
+        for i in range(2):
+            contact = ContactCreateSchema(
+                resource_name=f"people/nophone{i}",
+                display_name=f"No Phone {i}",
+                phone_numbers=[],
+                deleted=False,
+            )
+            contact_repo.create_contact(contact)
+        db_session.commit()
+
+        results = contact_repo.get_all_active_with_phones()
+        
+        # Should return exactly 3 contacts
+        assert len(results) == 3
+        display_names = [c.display_name for c in results]
+        assert "Contact 0" in display_names
+        assert "Contact 1" in display_names
+        assert "Contact 2" in display_names
+        assert "No Phone 0" not in display_names
+        assert "No Phone 1" not in display_names
+
 
 class TestCountContacts:
     """Test contact counting functionality."""
