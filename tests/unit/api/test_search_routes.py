@@ -11,21 +11,35 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from google_contacts_cisco.api.search_routes import get_search_service
 from google_contacts_cisco.main import app
+from google_contacts_cisco.models import get_db
 from google_contacts_cisco.models.contact import Contact
 from google_contacts_cisco.models.phone_number import PhoneNumber
-
-
-@pytest.fixture
-def client():
-    """Create test client."""
-    return TestClient(app)
 
 
 @pytest.fixture
 def mock_db_session():
     """Create mock database session."""
     return Mock()
+
+
+
+
+@pytest.fixture
+def client(mock_db_session):
+    """Create test client with dependency overrides."""
+    # Override get_db dependency
+    def override_get_db():
+        yield mock_db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with TestClient(app) as test_client:
+        yield test_client
+
+    # Clean up overrides
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture
@@ -108,10 +122,9 @@ def sample_contacts():
 class TestSearchContacts:
     """Tests for /api/contacts/search endpoint."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_contacts_success(
-        self, mock_get_service, mock_get_db, client, sample_contacts
+        self, mock_get_service, client, sample_contacts
     ):
         """Should return search results successfully."""
         # Setup mocks
@@ -119,7 +132,6 @@ class TestSearchContacts:
         mock_service.search_contacts.return_value = sample_contacts
         mock_service.count_search_results.return_value = 2
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search?q=John")
@@ -133,10 +145,9 @@ class TestSearchContacts:
         assert len(data["results"]) == 2
         assert data["has_more"] is False
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_contacts_with_pagination(
-        self, mock_get_service, mock_get_db, client, sample_contacts
+        self, mock_get_service, client, sample_contacts
     ):
         """Should handle pagination parameters."""
         # Setup mocks
@@ -144,7 +155,6 @@ class TestSearchContacts:
         mock_service.search_contacts.return_value = [sample_contacts[0]]
         mock_service.count_search_results.return_value = 10
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request with pagination
         response = client.get("/api/contacts/search?q=John&limit=1&offset=0")
@@ -157,10 +167,9 @@ class TestSearchContacts:
         assert data["has_more"] is True  # 0 + 1 < 10
         assert len(data["results"]) == 1
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_contacts_without_phone_search(
-        self, mock_get_service, mock_get_db, client
+        self, mock_get_service, client
     ):
         """Should support disabling phone search."""
         # Setup mocks
@@ -168,7 +177,6 @@ class TestSearchContacts:
         mock_service.search_contacts.return_value = []
         mock_service.count_search_results.return_value = 0
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get(
@@ -204,15 +212,13 @@ class TestSearchContacts:
         response = client.get("/api/contacts/search?q=test&offset=-1")
         assert response.status_code == 422
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
-    def test_search_contacts_service_error(self, mock_get_service, mock_get_db, client):
+    def test_search_contacts_service_error(self, mock_get_service, client):
         """Should return 500 on service error."""
         # Setup mocks to raise exception
         mock_service = Mock()
         mock_service.search_contacts.side_effect = Exception("Database error")
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search?q=test")
@@ -225,10 +231,9 @@ class TestSearchContacts:
 class TestSearchContactsByName:
     """Tests for /api/contacts/search/by-name endpoint."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_by_name_success(
-        self, mock_get_service, mock_get_db, client, sample_contacts
+        self, mock_get_service, client, sample_contacts
     ):
         """Should search by name only."""
         # Setup mocks
@@ -236,7 +241,6 @@ class TestSearchContactsByName:
         mock_service.search_by_name.return_value = sample_contacts
         mock_service.count_search_results.return_value = 2
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search/by-name?q=Smith")
@@ -247,10 +251,9 @@ class TestSearchContactsByName:
         assert len(data["results"]) == 2
         mock_service.search_by_name.assert_called_once()
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_by_name_with_pagination(
-        self, mock_get_service, mock_get_db, client, sample_contacts
+        self, mock_get_service, client, sample_contacts
     ):
         """Should handle pagination for name search."""
         # Setup mocks
@@ -258,7 +261,6 @@ class TestSearchContactsByName:
         mock_service.search_by_name.return_value = [sample_contacts[0]]
         mock_service.count_search_results.return_value = 5
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search/by-name?q=John&limit=1&offset=2")
@@ -283,17 +285,15 @@ class TestSearchContactsByName:
 class TestSearchContactsByPhone:
     """Tests for /api/contacts/search/by-phone endpoint."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_by_phone_success(
-        self, mock_get_service, mock_get_db, client, sample_contact
+        self, mock_get_service, client, sample_contact
     ):
         """Should search by phone number."""
         # Setup mocks
         mock_service = Mock()
         mock_service.search_by_phone.return_value = [sample_contact]
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search/by-phone?q=2025551234")
@@ -304,17 +304,15 @@ class TestSearchContactsByPhone:
         assert len(data["results"]) == 1
         assert data["results"][0]["display_name"] == "John Doe"
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_by_phone_formatted(
-        self, mock_get_service, mock_get_db, client, sample_contact
+        self, mock_get_service, client, sample_contact
     ):
         """Should handle formatted phone numbers."""
         # Setup mocks
         mock_service = Mock()
         mock_service.search_by_phone.return_value = [sample_contact]
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request with formatted number
         response = client.get("/api/contacts/search/by-phone?q=(202)%20555-1234")
@@ -338,17 +336,15 @@ class TestSearchContactsByPhone:
 class TestGetContact:
     """Tests for /api/contacts/{contact_id} endpoint."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
     def test_get_contact_success(
-        self, mock_repo_class, mock_get_db, client, sample_contact
+        self, mock_repo_class, client, sample_contact
     ):
         """Should return contact by ID."""
         # Setup mocks
         mock_repo = Mock()
         mock_repo.get_by_id.return_value = sample_contact
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get(f"/api/contacts/{sample_contact.id}")
@@ -362,15 +358,13 @@ class TestGetContact:
         assert "updated_at" in data
         assert len(data["phone_numbers"]) == 1
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
-    def test_get_contact_not_found(self, mock_repo_class, mock_get_db, client):
+    def test_get_contact_not_found(self, mock_repo_class, client):
         """Should return 404 for non-existent contact."""
         # Setup mocks
         mock_repo = Mock()
         mock_repo.get_by_id.return_value = None
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         contact_id = uuid.uuid4()
@@ -380,9 +374,8 @@ class TestGetContact:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
-    def test_get_contact_deleted(self, mock_repo_class, mock_get_db, client):
+    def test_get_contact_deleted(self, mock_repo_class, client):
         """Should return 404 for deleted contact."""
         # Setup mocks
         deleted_contact = Contact(
@@ -398,7 +391,6 @@ class TestGetContact:
         mock_repo = Mock()
         mock_repo.get_by_id.return_value = deleted_contact
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get(f"/api/contacts/{deleted_contact.id}")
@@ -415,18 +407,16 @@ class TestGetContact:
 class TestListContacts:
     """Tests for /api/contacts (list) endpoint."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
     def test_list_contacts_success(
-        self, mock_repo_class, mock_get_db, client, sample_contacts
+        self, mock_repo_class, client, sample_contacts
     ):
         """Should list all contacts with pagination."""
         # Setup mocks
         mock_repo = Mock()
-        mock_repo.list_contacts.return_value = sample_contacts
+        mock_repo.get_contacts.return_value = sample_contacts
         mock_repo.count_contacts.return_value = 2
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts")
@@ -439,18 +429,16 @@ class TestListContacts:
         assert data["limit"] == 50  # Default limit
         assert data["offset"] == 0  # Default offset
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
     def test_list_contacts_with_pagination(
-        self, mock_repo_class, mock_get_db, client, sample_contacts
+        self, mock_repo_class, client, sample_contacts
     ):
         """Should handle pagination parameters."""
         # Setup mocks
         mock_repo = Mock()
-        mock_repo.list_contacts.return_value = [sample_contacts[0]]
+        mock_repo.get_contacts.return_value = [sample_contacts[0]]
         mock_repo.count_contacts.return_value = 10
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts?limit=1&offset=5")
@@ -461,22 +449,20 @@ class TestListContacts:
         assert data["limit"] == 1
         assert data["offset"] == 5
         assert data["has_more"] is True  # 5 + 1 < 10
-        mock_repo.list_contacts.assert_called_once_with(
+        mock_repo.get_contacts.assert_called_once_with(
             limit=1,
             offset=5,
-            include_deleted=False,
+            sort_by_recent=False,
         )
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
-    def test_list_contacts_empty_result(self, mock_repo_class, mock_get_db, client):
+    def test_list_contacts_empty_result(self, mock_repo_class, client):
         """Should handle empty contact list."""
         # Setup mocks
         mock_repo = Mock()
-        mock_repo.list_contacts.return_value = []
+        mock_repo.get_contacts.return_value = []
         mock_repo.count_contacts.return_value = 0
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts")
@@ -506,10 +492,9 @@ class TestListContacts:
 class TestResponseModels:
     """Tests for response model serialization."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_contact_response_format(
-        self, mock_get_service, mock_get_db, client, sample_contact
+        self, mock_get_service, client, sample_contact
     ):
         """Should format contact response correctly."""
         # Setup mocks
@@ -517,7 +502,6 @@ class TestResponseModels:
         mock_service.search_contacts.return_value = [sample_contact]
         mock_service.count_search_results.return_value = 1
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search?q=John")
@@ -544,10 +528,9 @@ class TestResponseModels:
             assert "type" in phone
             assert "primary" in phone
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_response_pagination_fields(
-        self, mock_get_service, mock_get_db, client, sample_contacts
+        self, mock_get_service, client, sample_contacts
     ):
         """Should include all pagination fields in response."""
         # Setup mocks
@@ -555,7 +538,6 @@ class TestResponseModels:
         mock_service.search_contacts.return_value = sample_contacts
         mock_service.count_search_results.return_value = 5
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search?q=test&limit=2&offset=1")
@@ -579,17 +561,15 @@ class TestResponseModels:
 class TestErrorHandling:
     """Tests for error handling in search endpoints."""
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.get_search_service")
     def test_search_service_raises_exception(
-        self, mock_get_service, mock_get_db, client
+        self, mock_get_service, client
     ):
         """Should handle service exceptions gracefully."""
         # Setup mock to raise exception
         mock_service = Mock()
         mock_service.search_contacts.side_effect = RuntimeError("Test error")
         mock_get_service.return_value = mock_service
-        mock_get_db.return_value = Mock()
 
         # Make request
         response = client.get("/api/contacts/search?q=test")
@@ -598,15 +578,13 @@ class TestErrorHandling:
         assert response.status_code == 500
         assert "detail" in response.json()
 
-    @patch("google_contacts_cisco.api.search_routes.get_db")
     @patch("google_contacts_cisco.api.search_routes.ContactRepository")
-    def test_get_contact_repository_error(self, mock_repo_class, mock_get_db, client):
+    def test_get_contact_repository_error(self, mock_repo_class, client):
         """Should handle repository errors."""
         # Setup mock to raise exception
         mock_repo = Mock()
         mock_repo.get_by_id.side_effect = RuntimeError("Database error")
         mock_repo_class.return_value = mock_repo
-        mock_get_db.return_value = Mock()
 
         # Make request
         contact_id = uuid.uuid4()

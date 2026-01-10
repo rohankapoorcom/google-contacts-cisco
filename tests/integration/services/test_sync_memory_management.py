@@ -329,15 +329,19 @@ class TestSyncMemoryManagement:
         stats = sync_service.full_sync(batch_size=100, page_delay=0)
 
         # Verify operations
-        # Note: The deleted ones count as updates since they existed
+        # The sync processes contacts in order:
+        # 1. 100 updates (0-99) - all increment stats.updated = 100
+        # 2. 400 new contacts (100-499) - all increment stats.created = 400
+        # 3. 50 deletions (0-49) - increment stats.deleted = 50
+        # Note: Deletions are processed after updates, so all 100 contacts
+        # are counted as updates, then 50 of them are marked as deleted.
         assert stats.deleted == 50
         assert stats.created == 400  # New contacts
-        # Updates: 100 - 50 (deleted) = 50 updates + 50 deletions
-        assert stats.updated == 50
+        assert stats.updated == 100  # All 100 existing contacts were updated
 
         # Verify database state
         total = db_session.query(Contact).count()
         assert total == 500  # 100 existing + 400 new
 
-        active = db_session.query(Contact).filter(not Contact.deleted).count()
+        active = db_session.query(Contact).filter(Contact.deleted == False).count()
         assert active == 450  # 500 - 50 deleted
