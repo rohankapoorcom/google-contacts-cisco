@@ -5,14 +5,14 @@ This module tests the Pydantic schemas for parsing Google People API responses.
 import pytest
 
 from google_contacts_cisco.api.schemas import (
-    GoogleName,
-    GooglePhoneNumber,
-    GoogleEmailAddress,
-    GoogleOrganization,
-    GoogleMetadataSource,
-    GoogleMetadata,
-    GooglePerson,
     GoogleConnectionsResponse,
+    GoogleEmailAddress,
+    GoogleMetadata,
+    GoogleMetadataSource,
+    GoogleName,
+    GoogleOrganization,
+    GooglePerson,
+    GooglePhoneNumber,
 )
 
 
@@ -254,6 +254,92 @@ class TestGooglePerson:
             names=[GoogleName(familyName="Doe")],
         )
         assert person.get_display_name() == "Doe"
+
+    def test_get_display_name_fallback_to_organization(self):
+        """Test get_display_name falls back to organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="Acme Corporation")],
+        )
+        assert person.get_display_name() == "Acme Corporation"
+
+    def test_get_display_name_organization_before_email(self):
+        """Test get_display_name uses organization before email."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="Acme Corp")],
+            emailAddresses=[{"value": "info@acme.com"}],
+        )
+        assert person.get_display_name() == "Acme Corp"
+
+    def test_get_display_name_personal_name_over_organization(self):
+        """Test get_display_name prefers personal name over organization."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            names=[GoogleName(givenName="John")],
+            organizations=[GoogleOrganization(name="Acme Corp")],
+        )
+        assert person.get_display_name() == "John"
+
+    def test_get_display_name_empty_organization_name_skipped(self):
+        """Test get_display_name skips empty organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name=None)],
+            emailAddresses=[{"value": "test@test.com"}],
+        )
+        assert person.get_display_name() == "test@test.com"
+
+    def test_get_display_name_empty_string_organization_skipped(self):
+        """Test get_display_name skips empty string organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="")],
+            emailAddresses=[{"value": "test@test.com"}],
+        )
+        assert person.get_display_name() == "test@test.com"
+
+    def test_get_display_name_whitespace_only_organization_skipped(self):
+        """Test get_display_name skips whitespace-only organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="   ")],
+            emailAddresses=[{"value": "test@test.com"}],
+        )
+        assert person.get_display_name() == "test@test.com"
+
+    def test_get_display_name_organization_with_whitespace_trimmed(self):
+        """Test get_display_name trims whitespace from organization name."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[GoogleOrganization(name="  Acme Corp  ")],
+        )
+        assert person.get_display_name() == "Acme Corp"
+
+    def test_get_display_name_skips_empty_orgs_uses_later_org(self):
+        """Test get_display_name skips empty organizations and uses first valid one."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[
+                GoogleOrganization(name=None),
+                GoogleOrganization(name=""),
+                GoogleOrganization(name="   "),
+                GoogleOrganization(name="Valid Corp"),
+                GoogleOrganization(name="Second Corp"),
+            ],
+        )
+        assert person.get_display_name() == "Valid Corp"
+
+    def test_get_display_name_multiple_organizations_uses_first(self):
+        """Test get_display_name uses first organization when multiple exist."""
+        person = GooglePerson(
+            resourceName="people/c123",
+            organizations=[
+                GoogleOrganization(name="First Corp"),
+                GoogleOrganization(name="Second Corp"),
+            ],
+        )
+        assert person.get_display_name() == "First Corp"
 
     def test_get_display_name_fallback_to_email(self):
         """Test get_display_name falls back to email."""

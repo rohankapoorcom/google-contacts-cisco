@@ -95,8 +95,9 @@ class GooglePerson(BaseModel):
         2. Constructed from givenName + familyName
         3. Just givenName
         4. Just familyName
-        5. First email address
-        6. Resource name as last resort
+        5. Organization name (for business contacts)
+        6. First email address
+        7. Resource name as last resort
 
         Returns:
             Display name string, guaranteed to be non-empty
@@ -112,6 +113,11 @@ class GooglePerson(BaseModel):
                 return name.given_name
             elif name.family_name:
                 return name.family_name
+
+        # Fall back to organization name for business contacts
+        for org in self.organizations:
+            if org.name and org.name.strip():
+                return org.name.strip()
 
         # Fall back to email
         if self.email_addresses:
