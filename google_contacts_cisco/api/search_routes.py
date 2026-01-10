@@ -12,10 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..models import get_db
 from ..models.contact import Contact
 from ..repositories.contact_repository import ContactRepository
 from ..services.search_service import SearchService, get_search_service
+from ..utils.datetime_utils import format_timestamp_for_display
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -70,8 +72,8 @@ class ContactDetailResponse(BaseModel):
     given_name: Optional[str] = None
     family_name: Optional[str] = None
     phone_numbers: List[PhoneNumberResponse] = []
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -367,7 +369,8 @@ async def get_contact(
 
         logger.info("Retrieved contact: %s (%s)", contact.display_name, contact_id)
 
-        # Convert timestamps to ISO format strings
+        # Convert timestamps to ISO format strings with configured timezone
+        settings = get_settings()
         return ContactDetailResponse(
             id=contact.id,
             resource_name=contact.resource_name,
@@ -377,8 +380,8 @@ async def get_contact(
             phone_numbers=[
                 PhoneNumberResponse.model_validate(pn) for pn in contact.phone_numbers
             ],
-            created_at=contact.created_at.isoformat(),
-            updated_at=contact.updated_at.isoformat(),
+            created_at=format_timestamp_for_display(contact.created_at, settings.timezone),
+            updated_at=format_timestamp_for_display(contact.updated_at, settings.timezone),
         )
 
     except HTTPException:

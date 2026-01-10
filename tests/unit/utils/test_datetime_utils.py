@@ -80,6 +80,50 @@ class TestFormatTimestampForDisplay:
         
         # Should include microseconds
         assert "123456" in result
+    
+    def test_format_timestamp_to_tokyo(self):
+        """Test formatting UTC timestamp to Asia/Tokyo timezone."""
+        from zoneinfo import ZoneInfo
+        
+        dt = datetime(2026, 1, 9, 20, 30, 0, tzinfo=timezone.utc)
+        result = format_timestamp_for_display(dt, "Asia/Tokyo")
+        
+        # Tokyo is UTC+9
+        expected_dt = dt.astimezone(ZoneInfo("Asia/Tokyo"))
+        expected = expected_dt.isoformat()
+        
+        assert result == expected
+        assert "+09:00" in result
+    
+    def test_format_timestamp_to_los_angeles(self):
+        """Test formatting UTC timestamp to America/Los_Angeles timezone."""
+        from zoneinfo import ZoneInfo
+        
+        dt = datetime(2026, 1, 9, 20, 30, 0, tzinfo=timezone.utc)
+        result = format_timestamp_for_display(dt, "America/Los_Angeles")
+        
+        # LA is UTC-8 in January (PST)
+        expected_dt = dt.astimezone(ZoneInfo("America/Los_Angeles"))
+        expected = expected_dt.isoformat()
+        
+        assert result == expected
+        assert "-08:00" in result
+    
+    def test_format_timestamp_handles_dst_transition(self):
+        """Test formatting handles daylight saving time transitions."""
+        from zoneinfo import ZoneInfo
+        
+        # Summer time in London (BST = UTC+1)
+        dt_summer = datetime(2026, 7, 15, 12, 0, 0, tzinfo=timezone.utc)
+        result_summer = format_timestamp_for_display(dt_summer, "Europe/London")
+        expected_summer = dt_summer.astimezone(ZoneInfo("Europe/London")).isoformat()
+        assert result_summer == expected_summer
+        
+        # Winter time in London (GMT = UTC+0)
+        dt_winter = datetime(2026, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        result_winter = format_timestamp_for_display(dt_winter, "Europe/London")
+        expected_winter = dt_winter.astimezone(ZoneInfo("Europe/London")).isoformat()
+        assert result_winter == expected_winter
 
 
 class TestGetCurrentTimeUtc:
