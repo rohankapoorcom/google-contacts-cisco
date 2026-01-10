@@ -11,7 +11,6 @@ const router = useRouter()
 const route = useRoute()
 const isMobileMenuOpen = ref(false)
 const version = ref(__APP_VERSION__)
-const versionLoading = ref(false)
 
 // Navigation items
 const navigation = [
@@ -51,15 +50,12 @@ const currentYear = computed(() => new Date().getFullYear())
 // Fetch version from backend on mount
 onMounted(async () => {
   try {
-    versionLoading.value = true
     const backendVersion = await api.getVersion()
     version.value = backendVersion
   } catch (error) {
     // If fetching version fails, keep the build-time version from __APP_VERSION__
     // This provides graceful fallback when backend is unavailable
     console.warn('Failed to fetch version from backend, using build-time version:', error)
-  } finally {
-    versionLoading.value = false
   }
 })
 </script>
