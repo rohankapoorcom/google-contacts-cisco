@@ -579,4 +579,4 @@ class TestErrorHandling:
 
         # Assert
         assert response.status_code == 500
-        assert "Failed to retrieve contact" in response.json()["detail"]
+        assert "Failed to fetch contact" in response.json()["detail"]
