@@ -221,7 +221,12 @@ async def get_contact_by_id(
                 status_code=404, detail=f"Contact with ID {contact_id} not found"
             )
 
-        return ContactResponse.model_validate(contact)
+        if contact.deleted:
+            raise HTTPException(
+                status_code=404, detail=f"Contact with ID {contact_id} not found"
+            )
+
+        return ContactResponse.from_orm(contact)
 
     except HTTPException:
         raise
