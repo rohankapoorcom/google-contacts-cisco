@@ -52,7 +52,19 @@ bd sync               # Sync with git
 5. **Implement Solution**:
    - Write code
    - Write tests (TDD - alongside implementation)
-   - Verify quality checks
+   - **MANDATORY: Run quality checks BEFORE committing**:
+     ```bash
+     # Check linting
+     uv run ruff check .
+     uv run ruff format --check .
+     uv run black --check .
+     uv run mypy google_contacts_cisco
+     
+     # Run tests
+     uv run pytest -v
+     ```
+   - **FIX ALL LINTING ERRORS AND TEST FAILURES BEFORE COMMITTING**
+   - Never commit code with linting errors or failing tests
 
 6. **Mark Task Complete**:
    ```bash
@@ -62,6 +74,11 @@ bd sync               # Sync with git
 7. **Sync, Commit, and Push**:
    ```bash
    bd sync
+   
+   # MANDATORY: Final quality check before committing
+   uv run ruff check . && uv run ruff format . && uv run pytest -v
+   
+   # Only commit if all checks pass
    git add -A
    git commit -m "..."
    git push -u origin <branch-name>
@@ -90,9 +107,11 @@ bd show <id>               # 2. Review details
 bd update <id> --status in_progress  # 3. CLAIM FIRST (mandatory!)
 git checkout -b task/feature         # 4. Create branch
 # Write code and tests...             5. Implement
+uv run ruff check . && uv run pytest -v  # 5b. MANDATORY: Check linting & tests
 bd close <id>              # 6. Mark complete
 bd sync                    # 7. Sync with git
-git add -A && git commit   # 8. Commit changes
+uv run ruff format .       # 8a. Format code
+git add -A && git commit   # 8b. Commit changes (only if checks pass)
 git push -u origin task/feature     # 9. Push to remote
 # Use GitHub MCP to create PR        10. CREATE PR (mandatory!)
 ```
@@ -119,7 +138,20 @@ This document provides:
 **MANDATORY WORKFLOW:**
 
 1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
+2. **Run quality gates** (if code changed) - **MANDATORY BEFORE COMMITTING**:
+   ```bash
+   # Check all linting
+   uv run ruff check .
+   uv run ruff format --check .
+   uv run black --check .
+   uv run mypy google_contacts_cisco
+   
+   # Run all tests
+   uv run pytest -v
+   
+   # Fix any errors before proceeding
+   ```
+   **NEVER commit code with linting errors or failing tests**
 3. **Update issue status** - Close finished work, update in-progress items
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
@@ -140,9 +172,12 @@ This document provides:
 8. **Hand off** - Provide PR URL and context for next session
 
 **CRITICAL RULES:**
+- **NEVER commit code with linting errors or failing tests** - Always run `uv run ruff check .` and `uv run pytest -v` before committing
+- **Always format code** - Run `uv run ruff format .` before committing
 - Work is NOT complete until PR is created
 - NEVER stop after just pushing - YOU must create the PR
 - NEVER say "ready to create PR when you are" - YOU must create it
 - If PR creation fails, resolve and retry until it succeeds
 - A pushed branch without a PR is INCOMPLETE
+- **Quality gates are MANDATORY** - Linting and tests must pass before every commit
 
