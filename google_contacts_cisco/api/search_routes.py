@@ -72,8 +72,8 @@ class ContactDetailResponse(BaseModel):
     given_name: Optional[str] = None
     family_name: Optional[str] = None
     phone_numbers: List[PhoneNumberResponse] = []
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

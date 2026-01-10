@@ -124,7 +124,7 @@ class ContactSchema(ContactCreateSchema):
         data = self.model_dump()
         data["created_at"] = format_timestamp_for_display(self.created_at, timezone)
         data["updated_at"] = format_timestamp_for_display(self.updated_at, timezone)
-        data["synced_at"] = format_timestamp_for_display(self.synced_at, timezone) if self.synced_at else None
+        data["synced_at"] = format_timestamp_for_display(self.synced_at, timezone)
         data["id"] = str(self.id)
         return data
 

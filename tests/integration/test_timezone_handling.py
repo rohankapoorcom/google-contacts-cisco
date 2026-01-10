@@ -216,7 +216,11 @@ class TestTimezoneConsistency:
         integration_db.commit()
         integration_db.refresh(contact)
         
-        original_created = contact.created_at
+        # Store original created_at, normalize to UTC if naive
+        if contact.created_at.tzinfo is None:
+            original_created = contact.created_at.replace(tzinfo=timezone.utc)
+        else:
+            original_created = contact.created_at
         
         # Small delay to ensure updated_at changes
         import time
@@ -227,14 +231,19 @@ class TestTimezoneConsistency:
         integration_db.commit()
         integration_db.refresh(contact)
         
+        # Normalize both timestamps for comparison
+        if contact.created_at.tzinfo is None:
+            created_utc = contact.created_at.replace(tzinfo=timezone.utc)
+        else:
+            created_utc = contact.created_at
+            
+        if contact.updated_at.tzinfo is None:
+            updated_utc = contact.updated_at.replace(tzinfo=timezone.utc)
+        else:
+            updated_utc = contact.updated_at
+        
         # created_at should not change
-        assert contact.created_at == original_created
+        assert created_utc == original_created
         
         # updated_at should be later than created_at
-        # Handle naive datetimes from SQLite
-        if contact.created_at.tzinfo is None and contact.updated_at.tzinfo is None:
-            assert contact.updated_at >= contact.created_at
-        else:
-            created_utc = contact.created_at if contact.created_at.tzinfo else contact.created_at.replace(tzinfo=timezone.utc)
-            updated_utc = contact.updated_at if contact.updated_at.tzinfo else contact.updated_at.replace(tzinfo=timezone.utc)
-            assert updated_utc >= created_utc
+        assert updated_utc >= created_utc
