@@ -201,8 +201,8 @@ class ContactRepository:
         """
         return (
             self.db.query(Contact)
-            .join(PhoneNumber)
-            .filter(Contact.deleted == False)  # noqa: E712
+            .join(Contact.phone_numbers)
+            .filter(Contact.deleted.is_(False))
             .distinct()
             .all()
         )

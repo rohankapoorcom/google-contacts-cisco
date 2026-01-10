@@ -432,14 +432,11 @@ class TestGetContacts:
 
         results = contact_repo.get_all_active_with_phones()
         
-        # Should return exactly 3 contacts
+        # Should return exactly 3 contacts with specific names
         assert len(results) == 3
-        display_names = [c.display_name for c in results]
-        assert "Contact 0" in display_names
-        assert "Contact 1" in display_names
-        assert "Contact 2" in display_names
-        assert "No Phone 0" not in display_names
-        assert "No Phone 1" not in display_names
+        display_names = {c.display_name for c in results}
+        expected_names = {"Contact 0", "Contact 1", "Contact 2"}
+        assert display_names == expected_names
 
 
 class TestCountContacts:
