@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from ..auth.oauth import (
     CredentialsNotConfiguredError,
+    StateValidationError,
     TokenExchangeError,
     get_auth_status,
     get_authorization_url,
@@ -191,18 +192,28 @@ async def auth_callback(
     try:
         # Get full URL for token exchange
         authorization_response = str(request.url)
-        handle_oauth_callback(authorization_response)
+        creds, custom_data = handle_oauth_callback(authorization_response)
 
         logger.info("OAuth authentication completed successfully")
 
+        # Use custom_data (original state parameter) as redirect if present
         # Validate redirect is a safe relative path (not protocol-relative)
         redirect_to = "/"
-        if state and state.startswith("/") and not state.startswith("//"):
-            redirect_to = state
+        if custom_data and custom_data.startswith("/") and not custom_data.startswith("//"):
+            redirect_to = custom_data
 
         return HTMLResponse(
             content=_render_success_page(redirect_to),
             status_code=200,
+        )
+    except StateValidationError as e:
+        logger.error("OAuth state validation failed: %s", e)
+        return HTMLResponse(
+            content=_render_error_page(
+                "invalid_state",
+                "Security validation failed. Please try authenticating again.",
+            ),
+            status_code=400,
         )
     except TokenExchangeError as e:
         logger.error("Token exchange failed: %s", e)

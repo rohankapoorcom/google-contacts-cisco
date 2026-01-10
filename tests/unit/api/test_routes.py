@@ -131,7 +131,7 @@ class TestAuthCallbackEndpoint:
         with patch(
             "google_contacts_cisco.api.routes.handle_oauth_callback"
         ) as mock_handle:
-            mock_handle.return_value = mock_creds
+            mock_handle.return_value = (mock_creds, None)  # Return tuple
 
             response = client.get("/auth/callback?code=test_code&state=/")
 
@@ -146,7 +146,7 @@ class TestAuthCallbackEndpoint:
         with patch(
             "google_contacts_cisco.api.routes.handle_oauth_callback"
         ) as mock_handle:
-            mock_handle.return_value = mock_creds
+            mock_handle.return_value = (mock_creds, "/dashboard")  # Return tuple with custom_data
 
             response = client.get("/auth/callback?code=test_code&state=/dashboard")
 
