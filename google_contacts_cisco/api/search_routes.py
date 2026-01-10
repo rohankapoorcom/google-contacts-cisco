@@ -2,7 +2,8 @@
 
 This module provides FastAPI endpoints for searching contacts:
 - /api/contacts/search - Full-text search by name and phone
-- /api/contacts/{contact_id} - Get single contact by ID
+- /api/contacts/search/by-name - Search by name only
+- /api/contacts/search/by-phone - Search by phone number only
 """
 
 from typing import List, Optional
@@ -13,8 +14,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..models import get_db
-from ..repositories.contact_repository import ContactRepository
-from ..schemas.contact import ContactListResponse, ContactResponse as SchemaContactResponse
 from ..services.search_service import get_search_service
 from ..utils.logger import get_logger
 
@@ -59,21 +58,6 @@ class SearchResponse(BaseModel):
     limit: int
     offset: int
     has_more: bool
-
-
-class ContactDetailResponse(BaseModel):
-    """Detailed contact response schema."""
-
-    id: UUID
-    resource_name: str
-    display_name: str
-    given_name: Optional[str] = None
-    family_name: Optional[str] = None
-    phone_numbers: List[PhoneNumberResponse] = []
-    created_at: str
-    updated_at: str
-
-    model_config = {"from_attributes": True}
 
 
 # Endpoints
@@ -328,134 +312,3 @@ async def search_contacts_by_phone(
         ) from e
 
 
-@router.get("/{contact_id}", response_model=ContactDetailResponse)
-async def get_contact(
-    contact_id: UUID,
-    db: Session = Depends(get_db),
-) -> ContactDetailResponse:
-    """Get a single contact by ID.
-
-    Retrieves full contact details including all phone numbers.
-
-    Args:
-        contact_id: UUID of the contact
-        db: Database session (injected)
-
-    Returns:
-        ContactDetailResponse with complete contact information
-
-    Raises:
-        HTTPException: If contact not found or retrieval fails
-    """
-    try:
-        repository = ContactRepository(db)
-        contact = repository.get_by_id(contact_id)
-
-        if contact is None:
-            logger.warning("Contact not found: %s", contact_id)
-            raise HTTPException(
-                status_code=404,
-                detail=f"Contact with ID {contact_id} not found",
-            )
-
-        if contact.deleted:
-            logger.warning("Attempted to access deleted contact: %s", contact_id)
-            raise HTTPException(
-                status_code=404,
-                detail=f"Contact with ID {contact_id} not found",
-            )
-
-        logger.info("Retrieved contact: %s (%s)", contact.display_name, contact_id)
-
-        # Convert timestamps to ISO format strings
-        return ContactDetailResponse(
-            id=contact.id,  # type: ignore[arg-type]
-            resource_name=contact.resource_name,  # type: ignore[arg-type]
-            display_name=contact.display_name,  # type: ignore[arg-type]
-            given_name=contact.given_name,  # type: ignore[arg-type]
-            family_name=contact.family_name,  # type: ignore[arg-type]
-            phone_numbers=[
-                PhoneNumberResponse.model_validate(pn) for pn in contact.phone_numbers
-            ],
-            created_at=contact.created_at.isoformat(),
-            updated_at=contact.updated_at.isoformat(),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Failed to get contact %s: %s", contact_id, e, exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve contact: {str(e)}",
-        ) from e
-
-
-@router.get("", response_model=ContactListResponse)
-async def list_contacts(
-    limit: int = Query(
-        50,
-        description="Maximum number of results",
-        ge=1,
-        le=100,
-    ),
-    offset: int = Query(
-        0,
-        description="Number of results to skip for pagination",
-        ge=0,
-    ),
-    db: Session = Depends(get_db),
-) -> ContactListResponse:
-    """List all contacts (paginated).
-
-    Returns all non-deleted contacts in alphabetical order by display name.
-
-    Args:
-        limit: Maximum number of results to return (1-100)
-        offset: Number of results to skip for pagination
-        db: Database session (injected)
-
-    Returns:
-        ContactListResponse with contacts and pagination info
-
-    Raises:
-        HTTPException: If listing fails
-    """
-    try:
-        repository = ContactRepository(db)
-
-        # Get paginated contacts
-        contacts = repository.get_contacts(
-            limit=limit,
-            offset=offset,
-            sort_by_recent=False,
-        )
-
-        # Get total count
-        total = repository.count_contacts()
-
-        # Convert to response models using the schema's from_orm method
-        contact_responses = [
-            SchemaContactResponse.from_orm(contact) for contact in contacts
-        ]
-
-        logger.info(
-            "Listed contacts: returned=%d, total=%d",
-            len(contact_responses),
-            total,
-        )
-
-        return ContactListResponse(
-            contacts=contact_responses,
-            total=total,
-            limit=limit,
-            offset=offset,
-            has_more=(offset + len(contact_responses)) < total,
-        )
-
-    except Exception as e:
-        logger.error("Failed to list contacts: %s", e, exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to list contacts: {str(e)}",
-        ) from e
