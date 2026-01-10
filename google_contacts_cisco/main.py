@@ -211,26 +211,55 @@ if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
     @app.get("/{full_path:path}")
     async def serve_spa(_request: Request, full_path: str) -> FileResponse:
         """Serve Vue SPA for all non-API routes."""
+        from fastapi import HTTPException
+
         # Skip API and other backend routes
         api_prefixes = ("api/", "auth/", "directory/", "health", "docs", "openapi.json")
         if full_path.startswith(api_prefixes):
             # Return 404 for non-existent API routes
-            from fastapi import HTTPException
-
             raise HTTPException(status_code=404, detail="Not found")
 
-        # Check for static file first (e.g., vite.svg, favicon.ico)
-        # Prevent path traversal attacks by resolving and checking path is within STATIC_DIR
-        static_file = STATIC_DIR / full_path
-        resolved = static_file.resolve()
-        try:
-            resolved.relative_to(STATIC_DIR)
-        except ValueError:
-            # Path is outside STATIC_DIR, likely a path traversal attempt
-            raise HTTPException(status_code=403, detail="Forbidden")
+        # Sanitize path to prevent traversal attacks
+        # Remove any path components that attempt traversal
+        path_parts = [
+            part for part in full_path.split("/")
+            if part and part not in (".", "..")
+        ]
+        sanitized_path = "/".join(path_parts)
 
-        if resolved.exists() and resolved.is_file():
-            return FileResponse(resolved)
+        # Check for static file first (e.g., vite.svg, favicon.ico)
+        # Prevent path traversal attacks with multiple layers of validation
+        try:
+            static_file = STATIC_DIR / sanitized_path
+            # Use strict=True to raise FileNotFoundError if path doesn't exist
+            # This prevents symlink-based attacks
+            resolved = static_file.resolve(strict=False)
+
+            # Verify the resolved path is within STATIC_DIR
+            resolved_static = STATIC_DIR.resolve(strict=True)
+            resolved.relative_to(resolved_static)
+
+            # Additional check: ensure no symlinks in the path
+            if resolved.exists() and resolved.is_symlink():
+                logger.warning(
+                    "Blocked symlink access attempt: path=%s, client=%s",
+                    full_path,
+                    _request.client.host if _request.client else "unknown"
+                )
+                raise HTTPException(status_code=403, detail="Forbidden")
+
+            if resolved.exists() and resolved.is_file():
+                return FileResponse(resolved)
+
+        except (ValueError, OSError) as e:
+            # Path is outside STATIC_DIR or invalid - likely a traversal attempt
+            logger.warning(
+                "Blocked path traversal attempt: path=%s, client=%s, error=%s",
+                full_path,
+                _request.client.host if _request.client else "unknown",
+                str(e)
+            )
+            raise HTTPException(status_code=403, detail="Forbidden")
 
         # Serve index.html for all other routes (SPA routing)
         return FileResponse(STATIC_DIR / "index.html")
