@@ -2,7 +2,7 @@
 
 This package contains all FastAPI routers for the application:
 - routes: OAuth authentication endpoints
-- google: Google API related endpoints  
+- google: Google API related endpoints
 - sync: Contact synchronization endpoints
 
 Import routers directly from their modules to avoid circular imports:
@@ -14,13 +14,13 @@ Import routers directly from their modules to avoid circular imports:
 # The api.schemas module can be safely imported for schema definitions
 from .schemas import (
     GoogleConnectionsResponse,
-    GooglePerson,
-    GoogleName,
-    GooglePhoneNumber,
     GoogleEmailAddress,
-    GoogleOrganization,
     GoogleMetadata,
     GoogleMetadataSource,
+    GoogleName,
+    GoogleOrganization,
+    GooglePerson,
+    GooglePhoneNumber,
 )
 
 __all__ = [

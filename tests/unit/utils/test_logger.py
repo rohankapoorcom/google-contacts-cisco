@@ -11,8 +11,6 @@ import logging
 import sys
 from unittest.mock import Mock, patch
 
-import pytest
-
 from google_contacts_cisco.utils import logger as logger_module
 from google_contacts_cisco.utils.logger import (
     DEFAULT_LOG_FORMAT,
@@ -295,4 +293,3 @@ class TestLoggerIntegration:
         captured = capsys.readouterr()
         assert "Warning message" in captured.out
         assert "Error message" in captured.out
-

@@ -329,4 +329,3 @@ def get_auth_status() -> dict:
         "has_refresh_token": bool(creds.refresh_token),
         "scopes": list(creds.scopes) if creds.scopes else [],
     }
-

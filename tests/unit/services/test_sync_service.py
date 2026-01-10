@@ -25,7 +25,7 @@ def db_session():
     """Create test database session with in-memory SQLite."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+    Session = sessionmaker(bind=engine)  # noqa: N806
     session = Session()
     yield session
     session.close()
@@ -518,9 +518,7 @@ class TestIncrementalSync:
 
         # Verify new sync token stored
         new_sync_state = (
-            db_session.query(SyncState)
-            .order_by(SyncState.last_sync_at.desc())
-            .first()
+            db_session.query(SyncState).order_by(SyncState.last_sync_at.desc()).first()
         )
         assert new_sync_state.sync_token == "new_sync_token_456"
 
@@ -848,9 +846,7 @@ class TestIncrementalSyncErrors:
 
         # Verify error state
         latest_state = (
-            db_session.query(SyncState)
-            .order_by(SyncState.last_sync_at.desc())
-            .first()
+            db_session.query(SyncState).order_by(SyncState.last_sync_at.desc()).first()
         )
         assert latest_state.sync_status == SyncStatus.ERROR
         assert "API Error" in latest_state.error_message
@@ -914,9 +910,7 @@ class TestGetSyncServiceFactory:
 class TestSafeAutoSync:
     """Test safe_auto_sync with concurrency protection."""
 
-    def test_safe_auto_sync_success(
-        self, sync_service, db_session, mock_google_client
-    ):
+    def test_safe_auto_sync_success(self, sync_service, db_session, mock_google_client):
         """Test safe_auto_sync completes successfully."""
         mock_response = {
             "connections": [
@@ -958,9 +952,7 @@ class TestGetSyncHistory:
 
         assert history == []
 
-    def test_get_sync_history_returns_records(
-        self, sync_service, db_session
-    ):
+    def test_get_sync_history_returns_records(self, sync_service, db_session):
         """Test sync history returns multiple records."""
         # Create sync history
         state1 = SyncState(
@@ -986,9 +978,7 @@ class TestGetSyncHistory:
         assert history[1]["status"] == "idle"
         assert history[1]["has_sync_token"] is True
 
-    def test_get_sync_history_respects_limit(
-        self, sync_service, db_session
-    ):
+    def test_get_sync_history_respects_limit(self, sync_service, db_session):
         """Test sync history respects limit parameter."""
         # Create multiple sync states
         for i in range(5):
@@ -1072,9 +1062,7 @@ class TestGetSyncStatistics:
 class TestClearSyncHistory:
     """Test clearing sync history."""
 
-    def test_clear_sync_history_keep_latest(
-        self, sync_service, db_session
-    ):
+    def test_clear_sync_history_keep_latest(self, sync_service, db_session):
         """Test clearing history while keeping latest."""
         # Create multiple sync states
         state1 = SyncState(
@@ -1097,14 +1085,13 @@ class TestClearSyncHistory:
         assert deleted_count == 2
         remaining = db_session.query(SyncState).all()
         assert len(remaining) == 1
-        # Should keep the latest (12:00) - compare without timezone since SQLite strips it
+        # Should keep the latest (12:00) - compare without timezone
+        # since SQLite strips it
         assert remaining[0].last_sync_at.replace(tzinfo=None) == datetime(
             2024, 1, 1, 12, 0, 0
         )
 
-    def test_clear_sync_history_delete_all(
-        self, sync_service, db_session
-    ):
+    def test_clear_sync_history_delete_all(self, sync_service, db_session):
         """Test clearing all history."""
         # Create sync states
         for i in range(3):
@@ -1125,4 +1112,3 @@ class TestClearSyncHistory:
         deleted_count = sync_service.clear_sync_history(keep_latest=True)
 
         assert deleted_count == 0
-

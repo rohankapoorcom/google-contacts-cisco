@@ -21,6 +21,7 @@ logger = get_logger(__name__)
 @dataclass
 class SearchResult:
     """Search result with match metadata."""
+
     contact: Contact
     match_type: str  # 'exact', 'prefix', 'substring', 'phone'
     match_field: str  # field that matched ('display_name', 'phone_number', etc.)
@@ -81,21 +82,23 @@ class SearchService:
             # Search phone numbers
             phone_results = self.search_by_phone(search_term, limit=limit)
             for contact in phone_results:
-                results.append(SearchResult(
-                    contact=contact,
-                    match_type='phone',
-                    match_field='phone_number'
-                ))
+                results.append(
+                    SearchResult(
+                        contact=contact, match_type="phone", match_field="phone_number"
+                    )
+                )
         else:
             # Search by name
             contacts = self.search_by_name(search_term, limit=limit)
             for contact in contacts:
-                match_type, match_field = self._determine_match_type(contact, search_term)
-                results.append(SearchResult(
-                    contact=contact,
-                    match_type=match_type,
-                    match_field=match_field
-                ))
+                match_type, match_field = self._determine_match_type(
+                    contact, search_term
+                )
+                results.append(
+                    SearchResult(
+                        contact=contact, match_type=match_type, match_field=match_field
+                    )
+                )
 
         logger.info("Found %d contacts matching: %s", len(results), search_term)
         return results[:limit]  # Ensure we don't exceed limit
@@ -114,34 +117,34 @@ class SearchService:
         if contact.display_name:
             display_lower = contact.display_name.lower()
             if display_lower == query:
-                return ('exact', 'display_name')
+                return ("exact", "display_name")
             if display_lower.startswith(query):
-                return ('prefix', 'display_name')
+                return ("prefix", "display_name")
             if query in display_lower:
-                return ('substring', 'display_name')
+                return ("substring", "display_name")
 
         # Check given_name
         if contact.given_name:
             given_lower = contact.given_name.lower()
             if given_lower == query:
-                return ('exact', 'given_name')
+                return ("exact", "given_name")
             if given_lower.startswith(query):
-                return ('prefix', 'given_name')
+                return ("prefix", "given_name")
             if query in given_lower:
-                return ('substring', 'given_name')
+                return ("substring", "given_name")
 
         # Check family_name
         if contact.family_name:
             family_lower = contact.family_name.lower()
             if family_lower == query:
-                return ('exact', 'family_name')
+                return ("exact", "family_name")
             if family_lower.startswith(query):
-                return ('prefix', 'family_name')
+                return ("prefix", "family_name")
             if query in family_lower:
-                return ('substring', 'family_name')
+                return ("substring", "family_name")
 
         # Default to substring match
-        return ('substring', 'display_name')
+        return ("substring", "display_name")
 
     def search_contacts(
         self,
@@ -259,7 +262,7 @@ class SearchService:
             # Exact match on normalized value
             conditions.append(PhoneNumber.value == normalized)
             # Suffix match on last 7+ digits
-            digits_only = ''.join(c for c in normalized if c.isdigit())
+            digits_only = "".join(c for c in normalized if c.isdigit())
             if len(digits_only) >= 7:
                 # Escape digits for LIKE pattern
                 escaped_digits = self._escape_like_pattern(digits_only[-7:])
@@ -268,13 +271,11 @@ class SearchService:
                 )
 
         # Fallback: digit-only suffix match
-        digits = ''.join(c for c in phone_number if c.isdigit())
+        digits = "".join(c for c in phone_number if c.isdigit())
         if digits and len(digits) >= 7:
             # Escape digits for LIKE pattern
             escaped_digits = self._escape_like_pattern(digits[-7:])
-            conditions.append(
-                PhoneNumber.value.like(f"%{escaped_digits}", escape="\\")
-            )
+            conditions.append(PhoneNumber.value.like(f"%{escaped_digits}", escape="\\"))
 
         if not conditions:
             logger.warning(
@@ -364,11 +365,7 @@ class SearchService:
         Returns:
             Escaped value safe for LIKE patterns
         """
-        return (
-            value.replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
-        )
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     def _build_name_search_conditions(self, search_term: str) -> List:
         """Build search conditions for name fields.
@@ -408,25 +405,21 @@ class SearchService:
             conditions.append(PhoneNumber.value == normalized)
 
             # Suffix matching on digits - escape for LIKE pattern
-            digits_only = ''.join(c for c in normalized if c.isdigit())
+            digits_only = "".join(c for c in normalized if c.isdigit())
             if len(digits_only) >= 7:
                 # Extract digits only, which are safe (no special chars)
                 # But still escape in case of future changes
                 escaped_digits = self._escape_like_pattern(digits_only[-7:])
                 suffix_pattern = f"%{escaped_digits}"
-                conditions.append(
-                    PhoneNumber.value.like(suffix_pattern, escape="\\")
-                )
+                conditions.append(PhoneNumber.value.like(suffix_pattern, escape="\\"))
 
         # Fallback: digit-only matching for partial numbers
-        digits = ''.join(c for c in search_term if c.isdigit())
+        digits = "".join(c for c in search_term if c.isdigit())
         if digits and len(digits) >= 4:
             # Escape digits for LIKE pattern safety
             escaped_digits = self._escape_like_pattern(digits)
             digit_pattern = f"%{escaped_digits}%"
-            conditions.append(
-                PhoneNumber.value.like(digit_pattern, escape="\\")
-            )
+            conditions.append(PhoneNumber.value.like(digit_pattern, escape="\\"))
             # Also try display_value
             conditions.append(
                 PhoneNumber.display_value.like(digit_pattern, escape="\\")

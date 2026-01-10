@@ -3,11 +3,6 @@
 This module tests the config_utils functions from Task 03: Configuration Management.
 """
 
-import io
-import sys
-
-import pytest
-
 from google_contacts_cisco.config import Settings
 from google_contacts_cisco.config_utils import (
     generate_secret_key,

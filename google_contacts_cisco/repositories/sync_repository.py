@@ -37,11 +37,7 @@ class SyncRepository:
         Returns:
             Latest sync state or None if no syncs have occurred
         """
-        return (
-            self.db.query(SyncState)
-            .order_by(SyncState.last_sync_at.desc())
-            .first()
-        )
+        return self.db.query(SyncState).order_by(SyncState.last_sync_at.desc()).first()
 
     def get_sync_state_by_id(self, sync_id) -> Optional[SyncState]:
         """Get sync state by ID.
@@ -109,13 +105,13 @@ class SyncRepository:
             Updated sync state entity
         """
         if sync_token is not None:
-            sync_state.sync_token = sync_token
+            sync_state.sync_token = sync_token  # type: ignore[assignment]
         if status is not None:
-            sync_state.sync_status = status
+            sync_state.sync_status = status  # type: ignore[assignment]
         if error_message is not None:
-            sync_state.error_message = error_message
+            sync_state.error_message = error_message  # type: ignore[assignment]
 
-        sync_state.last_sync_at = datetime.now(timezone.utc)
+        sync_state.last_sync_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         logger.debug(
             "Updated sync state: status=%s, has_token=%s",
             sync_state.sync_status.value,
@@ -131,7 +127,7 @@ class SyncRepository:
         """
         latest = self.get_latest_sync_state()
         if latest and latest.sync_status != SyncStatus.ERROR:
-            return latest.sync_token
+            return latest.sync_token  # type: ignore[return-value]
         return None
 
     def has_completed_sync(self) -> bool:
@@ -141,7 +137,7 @@ class SyncRepository:
             True if at least one successful sync has completed
         """
         latest = self.get_latest_sync_state()
-        return latest is not None and latest.sync_status == SyncStatus.IDLE
+        return latest is not None and latest.sync_status == SyncStatus.IDLE  # type: ignore[return-value]
 
     def is_sync_in_progress(self) -> bool:
         """Check if a sync is currently in progress.
@@ -150,7 +146,7 @@ class SyncRepository:
             True if a sync is currently running
         """
         latest = self.get_latest_sync_state()
-        return latest is not None and latest.sync_status == SyncStatus.SYNCING
+        return latest is not None and latest.sync_status == SyncStatus.SYNCING  # type: ignore[return-value]
 
     def delete_all(self) -> int:
         """Delete all sync states (for testing).
@@ -161,4 +157,3 @@ class SyncRepository:
         count = self.db.query(SyncState).delete()
         logger.info("Deleted all sync states: %d", count)
         return count
-

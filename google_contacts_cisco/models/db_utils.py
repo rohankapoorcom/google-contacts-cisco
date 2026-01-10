@@ -1,7 +1,9 @@
 """Database utility functions."""
+
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from . import engine, Base
+
+from . import Base, engine
 
 
 def create_tables() -> None:
@@ -16,7 +18,7 @@ def drop_tables() -> None:
 
 def check_connection() -> bool:
     """Check if database connection is available.
-    
+
     Returns:
         True if connection is successful, False otherwise.
     """
@@ -26,4 +28,3 @@ def check_connection() -> bool:
         return True
     except SQLAlchemyError:
         return False
-

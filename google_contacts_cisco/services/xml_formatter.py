@@ -85,9 +85,7 @@ class CiscoXMLFormatter:
 
         return self._to_xml_string(root)
 
-    def generate_group_directory(
-        self, group: str, contacts: List["Contact"]
-    ) -> str:
+    def generate_group_directory(self, group: str, contacts: List["Contact"]) -> str:
         """Generate directory menu for a specific group.
 
         Creates a CiscoIPPhoneMenu listing contacts in the specified group.
@@ -112,7 +110,7 @@ class CiscoXMLFormatter:
 
                 name = etree.SubElement(item, "Name")
                 # lxml handles XML escaping automatically when setting .text
-                name.text = contact.display_name or ""
+                name.text = contact.display_name or ""  # type: ignore[assignment]
 
                 url = etree.SubElement(item, "URL")
                 url.text = f"{self.base_url}/directory/contacts/{contact.id}"
@@ -146,7 +144,7 @@ class CiscoXMLFormatter:
 
         # Title - lxml handles XML escaping automatically when setting .text
         title = etree.SubElement(root, "Title")
-        title.text = contact.display_name or ""
+        title.text = contact.display_name or ""  # type: ignore[assignment]
 
         # Add phone numbers
         phone_numbers = getattr(contact, "phone_numbers", None) or []
@@ -230,9 +228,7 @@ class CiscoXMLFormatter:
 
         # Strip common extension suffixes before extracting digits
         # This prevents extension digits from corrupting the dial string
-        s = re.sub(
-            r"\s*(?:ext\.?|x|extension)\s*\d+\s*$", "", s, flags=re.IGNORECASE
-        )
+        s = re.sub(r"\s*(?:ext\.?|x|extension)\s*\d+\s*$", "", s, flags=re.IGNORECASE)
 
         # Extract only digits from the phone number
         digits = "".join(c for c in s if c.isdigit())
@@ -455,4 +451,3 @@ def get_xml_formatter(base_url: str = "http://localhost:8000") -> CiscoXMLFormat
         CiscoXMLFormatter instance
     """
     return CiscoXMLFormatter(base_url)
-

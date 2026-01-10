@@ -185,4 +185,3 @@ def stop_sync_scheduler() -> None:
     if _scheduler:
         _scheduler.stop()
         _scheduler = None
-

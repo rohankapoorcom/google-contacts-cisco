@@ -267,11 +267,16 @@ class GoogleContactsClient:
             HttpError: If API request fails
         """
         try:
-            response = self.service.people().connections().list(
-                resourceName="people/me",
-                pageSize=1,
-                personFields="names",
-            ).execute()
+            response = (
+                self.service.people()
+                .connections()
+                .list(
+                    resourceName="people/me",
+                    pageSize=1,
+                    personFields="names",
+                )
+                .execute()
+            )
             total: int = response.get("totalItems", 0) or response.get("totalPeople", 0)
             logger.debug("Total connections count: %d", total)
             return total

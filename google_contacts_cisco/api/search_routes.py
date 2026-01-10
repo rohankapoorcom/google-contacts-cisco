@@ -9,15 +9,12 @@ from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..models import get_db
-from ..models.contact import Contact
 from ..repositories.contact_repository import ContactRepository
-from ..services.search_service import SearchService, get_search_service
-from ..utils.datetime_utils import format_timestamp_for_display
+from ..services.search_service import get_search_service
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -72,8 +69,8 @@ class ContactDetailResponse(BaseModel):
     given_name: Optional[str] = None
     family_name: Optional[str] = None
     phone_numbers: List[PhoneNumberResponse] = []
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str
+    updated_at: str
 
     model_config = {"from_attributes": True}
 
@@ -369,19 +366,18 @@ async def get_contact(
 
         logger.info("Retrieved contact: %s (%s)", contact.display_name, contact_id)
 
-        # Convert timestamps to ISO format strings with configured timezone
-        settings = get_settings()
+        # Convert timestamps to ISO format strings
         return ContactDetailResponse(
-            id=contact.id,
-            resource_name=contact.resource_name,
-            display_name=contact.display_name,
-            given_name=contact.given_name,
-            family_name=contact.family_name,
+            id=contact.id,  # type: ignore[arg-type]
+            resource_name=contact.resource_name,  # type: ignore[arg-type]
+            display_name=contact.display_name,  # type: ignore[arg-type]
+            given_name=contact.given_name,  # type: ignore[arg-type]
+            family_name=contact.family_name,  # type: ignore[arg-type]
             phone_numbers=[
                 PhoneNumberResponse.model_validate(pn) for pn in contact.phone_numbers
             ],
-            created_at=format_timestamp_for_display(contact.created_at, settings.timezone),
-            updated_at=format_timestamp_for_display(contact.updated_at, settings.timezone),
+            created_at=contact.created_at.isoformat(),
+            updated_at=contact.updated_at.isoformat(),
         )
 
     except HTTPException:
@@ -428,14 +424,14 @@ async def list_contacts(
         repository = ContactRepository(db)
 
         # Get paginated contacts
-        contacts = repository.list_contacts(
+        contacts = repository.get_contacts(
             limit=limit,
             offset=offset,
-            include_deleted=False,
+            sort_by_recent=False,
         )
 
         # Get total count
-        total_count = repository.count_contacts(include_deleted=False)
+        total_count = repository.count_contacts()
 
         # Convert to response models
         contact_responses = [

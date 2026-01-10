@@ -3,6 +3,7 @@
 This module provides functions to convert Google People API response
 data into the internal contact format used by the application.
 """
+
 from typing import List
 
 from ..api.schemas import GooglePerson
@@ -92,4 +93,3 @@ def transform_google_persons_batch(
         List of ContactCreateSchema
     """
     return [transform_google_person_to_contact(person) for person in persons]
-

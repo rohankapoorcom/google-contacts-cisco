@@ -7,18 +7,15 @@ building on top of the base fixtures from the main conftest.py.
 import os
 from datetime import datetime, timezone
 from typing import Generator
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from google_contacts_cisco.main import app
-from google_contacts_cisco.models import get_db
-from google_contacts_cisco.models import Base, Contact, PhoneNumber, SyncState
+from google_contacts_cisco.models import Contact, PhoneNumber, SyncState, get_db
 from google_contacts_cisco.models.sync_state import SyncStatus
-
 
 # =============================================================================
 # Integration Database Fixtures
@@ -28,11 +25,11 @@ from google_contacts_cisco.models.sync_state import SyncStatus
 @pytest.fixture(scope="function")
 def integration_db(test_engine) -> Generator[Session, None, None]:
     """Create an integration test database session.
-    
+
     Reuses the test_engine from base conftest and provides a database session
     that is used for integration tests.
     """
-    TestingSessionLocal = sessionmaker(
+    TestingSessionLocal = sessionmaker(  # noqa: N806
         autocommit=False, autoflush=False, bind=test_engine
     )
     session = TestingSessionLocal()
@@ -46,22 +43,22 @@ def integration_db(test_engine) -> Generator[Session, None, None]:
 @pytest.fixture(scope="function")
 def integration_client(test_engine) -> TestClient:
     """Create a FastAPI test client with integrated database.
-    
+
     This client uses the test database for all requests,
     allowing tests to verify end-to-end workflows.
     """
     # Create a session factory
-    TestingSessionLocal = sessionmaker(
+    TestingSessionLocal = sessionmaker(  # noqa: N806
         autocommit=False, autoflush=False, bind=test_engine
     )
-    
+
     def override_get_db():
         db = TestingSessionLocal()
         try:
             yield db
         finally:
             db.close()
-    
+
     app.dependency_overrides[get_db] = override_get_db
     client = TestClient(app)
     yield client
@@ -166,14 +163,14 @@ def mock_google_api_responses():
 @pytest.fixture
 def mock_google_client_service(mock_google_api_responses):
     """Mock Google People API client service for integration tests.
-    
+
     Simulates the Google People API with realistic responses.
     """
     service = Mock()
-    
+
     # Track call count for pagination
     call_count = {"list_calls": 0}
-    
+
     def list_side_effect(*args, **kwargs):
         """Simulate paginated list responses."""
         call_count["list_calls"] += 1
@@ -183,11 +180,13 @@ def mock_google_client_service(mock_google_api_responses):
             return mock_google_api_responses["connections_list_page2"]
         else:
             return mock_google_api_responses["empty_response"]
-    
+
     # Mock the service structure
     service.people().connections().list().execute.side_effect = list_side_effect
-    service.people().connections().sync().execute.return_value = mock_google_api_responses["sync_response"]
-    
+    service.people().connections().sync().execute.return_value = (
+        mock_google_api_responses["sync_response"]
+    )
+
     return service
 
 
@@ -200,7 +199,7 @@ def mock_google_client_service(mock_google_api_responses):
 def integration_test_contacts(integration_db) -> list[Contact]:
     """Create a set of test contacts in the integration database."""
     contacts = []
-    
+
     # Contact with full data
     contact1 = Contact(
         resource_name="people/test1",
@@ -213,7 +212,7 @@ def integration_test_contacts(integration_db) -> list[Contact]:
     )
     integration_db.add(contact1)
     integration_db.flush()
-    
+
     phone1 = PhoneNumber(
         contact_id=contact1.id,
         value="+15551001",
@@ -223,7 +222,7 @@ def integration_test_contacts(integration_db) -> list[Contact]:
     )
     integration_db.add(phone1)
     contacts.append(contact1)
-    
+
     # Contact with minimal data
     contact2 = Contact(
         resource_name="people/test2",
@@ -231,7 +230,7 @@ def integration_test_contacts(integration_db) -> list[Contact]:
     )
     integration_db.add(contact2)
     contacts.append(contact2)
-    
+
     # Contact with multiple phones
     contact3 = Contact(
         resource_name="people/test3",
@@ -241,7 +240,7 @@ def integration_test_contacts(integration_db) -> list[Contact]:
     )
     integration_db.add(contact3)
     integration_db.flush()
-    
+
     for i, phone_type in enumerate(["mobile", "work", "home"]):
         phone = PhoneNumber(
             contact_id=contact3.id,
@@ -252,11 +251,11 @@ def integration_test_contacts(integration_db) -> list[Contact]:
         )
         integration_db.add(phone)
     contacts.append(contact3)
-    
+
     integration_db.commit()
     for contact in contacts:
         integration_db.refresh(contact)
-    
+
     return contacts
 
 
@@ -287,16 +286,16 @@ def mock_oauth_flow():
         "https://accounts.google.com/o/oauth2/auth?mock=true",
         "mock_state",
     )
-    
+
     mock_credentials = Mock()
     mock_credentials.token = "mock_access_token"
     mock_credentials.refresh_token = "mock_refresh_token"
     mock_credentials.valid = True
     mock_credentials.expired = False
-    
+
     mock_flow.fetch_token.return_value = None
     mock_flow.credentials = mock_credentials
-    
+
     return mock_flow
 
 
@@ -324,15 +323,15 @@ def mock_credentials():
 def integration_test_env():
     """Set up environment for integration tests."""
     original_env = os.environ.copy()
-    
+
     # Set test environment variables
     os.environ["TESTING"] = "1"
     os.environ["DATABASE_URL"] = "sqlite:///:memory:"
     os.environ["GOOGLE_CLIENT_ID"] = "test_client_id"
     os.environ["GOOGLE_CLIENT_SECRET"] = "test_client_secret"
-    
+
     yield
-    
+
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)

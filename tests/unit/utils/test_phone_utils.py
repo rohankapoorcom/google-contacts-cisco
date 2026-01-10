@@ -611,8 +611,7 @@ class TestPhoneNumberPrefixes:
     def test_prefix_preserves_custom_display(self, normalizer):
         """Should preserve custom display value even with prefix."""
         normalized, display = normalizer.normalize(
-            "*67 2025551234",
-            display_value="Hidden: (202) 555-1234"
+            "*67 2025551234", display_value="Hidden: (202) 555-1234"
         )
         assert normalized == "+12025551234"
         assert display == "Hidden: (202) 555-1234"
@@ -667,5 +666,3 @@ class TestPhoneNumberPrefixes:
         # Stored never has prefix (normalized), search might
         # Use full number with prefix to ensure valid parsing
         assert normalizer.matches(stored, "*67 202-555-1234")
-
-

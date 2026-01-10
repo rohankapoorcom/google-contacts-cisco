@@ -1112,4 +1112,3 @@ class TestEdgeCases(TestCiscoXMLFormatter):
         title = root.find("Title")
         assert "John" in title.text
         assert "Doe" in title.text
-

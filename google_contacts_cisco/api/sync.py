@@ -443,9 +443,7 @@ async def get_sync_history(
     """
     sync_service = get_sync_service(db)
     history = sync_service.get_sync_history(limit)
-    return SyncHistoryResponse(
-        history=[SyncHistoryEntry(**entry) for entry in history]
-    )
+    return SyncHistoryResponse(history=[SyncHistoryEntry(**entry) for entry in history])
 
 
 @router.get("/statistics", response_model=SyncStatisticsResponse)
@@ -512,4 +510,3 @@ async def clear_sync_history(
         status="success",
         deleted_count=deleted_count,
     )
-

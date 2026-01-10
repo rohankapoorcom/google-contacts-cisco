@@ -1,13 +1,10 @@
 """Test main application."""
 
-from pathlib import Path
-
 from fastapi.testclient import TestClient
 
-from google_contacts_cisco.main import app, STATIC_DIR
 from google_contacts_cisco._version import __version__
 from google_contacts_cisco.config import settings
-
+from google_contacts_cisco.main import STATIC_DIR, app
 
 client = TestClient(app)
 

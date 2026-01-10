@@ -20,7 +20,6 @@ from google_contacts_cisco.main import app
 from google_contacts_cisco.models import Base, Contact, PhoneNumber, SyncState
 from google_contacts_cisco.models.sync_state import SyncStatus
 
-
 # =============================================================================
 # Test Configuration
 # =============================================================================
@@ -44,7 +43,7 @@ def test_environment():
 @pytest.fixture(scope="function")
 def test_engine():
     """Create a test database engine.
-    
+
     Uses SQLite in-memory database for fast, isolated tests.
     Each test gets a fresh database instance.
     """
@@ -62,17 +61,17 @@ def test_engine():
 @pytest.fixture(scope="function")
 def db_session(test_engine) -> Generator[Session, None, None]:
     """Create a test database session.
-    
+
     Provides a clean database session for each test.
     Automatically rolls back transactions after each test.
-    
+
     Usage:
         def test_example(db_session):
             contact = Contact(...)
             db_session.add(contact)
             db_session.commit()
     """
-    TestingSessionLocal = sessionmaker(
+    TestingSessionLocal = sessionmaker(  # noqa: N806
         autocommit=False, autoflush=False, bind=test_engine
     )
     session = TestingSessionLocal()
@@ -91,9 +90,9 @@ def db_session(test_engine) -> Generator[Session, None, None]:
 @pytest.fixture(scope="function")
 def test_client() -> TestClient:
     """Create a FastAPI test client.
-    
+
     Provides a test client for making API requests.
-    
+
     Usage:
         def test_endpoint(test_client):
             response = test_client.get("/health")
@@ -110,7 +109,7 @@ def test_client() -> TestClient:
 @pytest.fixture
 def sample_contact(db_session) -> Contact:
     """Create a sample contact for testing.
-    
+
     Returns a committed Contact object with basic fields populated.
     """
     contact = Contact(
@@ -131,7 +130,7 @@ def sample_contact(db_session) -> Contact:
 @pytest.fixture
 def sample_contact_with_phones(db_session) -> Contact:
     """Create a sample contact with multiple phone numbers.
-    
+
     Returns a Contact with:
     - Primary mobile number: +1-555-0100
     - Work number: +1-555-0101
@@ -144,7 +143,7 @@ def sample_contact_with_phones(db_session) -> Contact:
     )
     db_session.add(contact)
     db_session.flush()
-    
+
     mobile = PhoneNumber(
         contact_id=contact.id,
         value="+15550100",
@@ -168,7 +167,7 @@ def sample_contact_with_phones(db_session) -> Contact:
 @pytest.fixture
 def sample_contacts_batch(db_session) -> list[Contact]:
     """Create a batch of sample contacts for testing.
-    
+
     Returns a list of 5 contacts with various configurations:
     - Contacts with/without phone numbers
     - Different name combinations
@@ -184,11 +183,11 @@ def sample_contacts_batch(db_session) -> list[Contact]:
         )
         for i in range(1, 6)
     ]
-    
+
     for contact in contacts:
         db_session.add(contact)
     db_session.flush()
-    
+
     # Add phone numbers to some contacts
     for i, contact in enumerate(contacts):
         if i % 2 == 0:  # Even-indexed contacts get phone numbers
@@ -200,7 +199,7 @@ def sample_contacts_batch(db_session) -> list[Contact]:
                 primary=True,
             )
             db_session.add(phone)
-    
+
     db_session.commit()
     for contact in contacts:
         db_session.refresh(contact)
@@ -229,7 +228,7 @@ def sample_sync_state(db_session) -> SyncState:
 @pytest.fixture
 def mock_google_credentials():
     """Create mock Google OAuth credentials.
-    
+
     Returns a mock credentials object with token and refresh_token.
     Useful for testing OAuth flows without real Google API calls.
     """
@@ -248,13 +247,14 @@ def mock_google_credentials():
 @pytest.fixture
 def mock_google_people_service():
     """Create a mock Google People API service.
-    
+
     Returns a mock service object that can be used to test
     Google API interactions without making real API calls.
-    
+
     Usage:
         def test_google_api(mock_google_people_service):
-            mock_google_people_service.people().connections().list().execute.return_value = {...}
+            service = mock_google_people_service.people().connections().list()
+            service.execute.return_value = {...}
     """
     service = Mock()
     # Set up basic mock structure
@@ -268,7 +268,7 @@ def mock_google_people_service():
 @pytest.fixture
 def sample_google_contact_response():
     """Sample Google People API contact response.
-    
+
     Returns a dictionary matching the structure of a real
     Google People API contact response for testing parsers.
     """
@@ -322,10 +322,10 @@ def sample_google_contact_response():
 @pytest.fixture
 def temp_test_dir(tmp_path) -> Path:
     """Create a temporary directory for test files.
-    
+
     Returns a Path object to a temporary directory.
     The directory is automatically cleaned up after the test.
-    
+
     Usage:
         def test_file_operations(temp_test_dir):
             test_file = temp_test_dir / "test.txt"
@@ -337,7 +337,7 @@ def temp_test_dir(tmp_path) -> Path:
 @pytest.fixture
 def temp_token_file(tmp_path) -> Path:
     """Create a temporary token file path for testing OAuth.
-    
+
     Returns a Path to a non-existent token file in a temp directory.
     Useful for testing token storage without affecting real files.
     """
@@ -352,18 +352,10 @@ def temp_token_file(tmp_path) -> Path:
 
 def pytest_configure(config):
     """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "unit: mark test as a unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
-    config.addinivalue_line(
-        "markers", "e2e: mark test as an end-to-end test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "e2e: mark test as an end-to-end test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
 
 
 # =============================================================================
@@ -378,19 +370,19 @@ def create_test_contact(
     **kwargs,
 ) -> Contact:
     """Helper function to create test contacts with custom fields.
-    
+
     Args:
         db_session: Database session
         resource_name: Google resource name (auto-generated if None)
         display_name: Contact display name
         **kwargs: Additional contact fields
-    
+
     Returns:
         Created and committed Contact object
     """
     if resource_name is None:
         resource_name = f"people/{uuid.uuid4().hex[:10]}"
-    
+
     contact = Contact(
         resource_name=resource_name,
         display_name=display_name,
@@ -409,13 +401,13 @@ def create_test_phone(
     **kwargs,
 ) -> PhoneNumber:
     """Helper function to create test phone numbers.
-    
+
     Args:
         db_session: Database session
         contact: Contact to attach phone number to
         value: Phone number value
         **kwargs: Additional phone number fields
-    
+
     Returns:
         Created and committed PhoneNumber object
     """

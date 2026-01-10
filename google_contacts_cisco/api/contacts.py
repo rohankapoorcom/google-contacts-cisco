@@ -18,10 +18,10 @@ from sqlalchemy.orm import Session
 from ..models import get_db
 from ..repositories.contact_repository import ContactRepository
 from ..schemas.contact import (
-    ContactResponse,
     ContactListResponse,
-    PhoneNumberResponse,
+    ContactResponse,
     EmailAddressResponse,
+    PhoneNumberResponse,
 )
 from ..services.search_service import SearchService
 
@@ -64,10 +64,16 @@ class SearchResultsResponse(BaseModel):
 
 @router.get("/contacts", response_model=ContactListResponse)
 async def get_contacts(
-    limit: int = Query(default=30, ge=1, le=100, description="Number of contacts per page"),
+    limit: int = Query(
+        default=30, ge=1, le=100, description="Number of contacts per page"
+    ),
     offset: int = Query(default=0, ge=0, description="Offset for pagination"),
-    sort: Optional[str] = Query(default="name", description="Sort order: 'name' or 'recent'"),
-    group: Optional[str] = Query(default=None, description="Filter by first letter (A-Z, #)"),
+    sort: Optional[str] = Query(
+        default="name", description="Sort order: 'name' or 'recent'"
+    ),
+    group: Optional[str] = Query(
+        default=None, description="Filter by first letter (A-Z, #)"
+    ),
     db: Session = Depends(get_db),
 ) -> ContactListResponse:
     """Get a paginated list of contacts.
@@ -88,6 +94,7 @@ async def get_contacts(
         ContactListResponse with contacts and pagination metadata
     """
     import time
+
     start_time = time.time()
 
     repo = ContactRepository(db)
@@ -102,10 +109,7 @@ async def get_contacts(
             if group == "#":
                 # Get contacts starting with numbers or special characters
                 contacts = repo.get_contacts_by_letter_group(
-                    "#",
-                    limit=limit,
-                    offset=offset,
-                    sort_by_recent=sort_by_recent
+                    "#", limit=limit, offset=offset, sort_by_recent=sort_by_recent
                 )
                 total = repo.count_contacts_by_letter_group("#")
             elif len(group) == 1 and group.isalpha():
@@ -114,20 +118,18 @@ async def get_contacts(
                     group.upper(),
                     limit=limit,
                     offset=offset,
-                    sort_by_recent=sort_by_recent
+                    sort_by_recent=sort_by_recent,
                 )
                 total = repo.count_contacts_by_letter_group(group.upper())
             else:
                 raise HTTPException(
                     status_code=400,
-                    detail="Group must be a single letter (A-Z) or '#' for numbers"
+                    detail="Group must be a single letter (A-Z) or '#' for numbers",
                 )
         else:
             # Get all contacts
             contacts = repo.get_contacts(
-                limit=limit,
-                offset=offset,
-                sort_by_recent=sort_by_recent
+                limit=limit, offset=offset, sort_by_recent=sort_by_recent
             )
             total = repo.count_contacts()
 
@@ -143,7 +145,7 @@ async def get_contacts(
             limit,
             group,
             sort,
-            elapsed_ms
+            elapsed_ms,
         )
 
         return ContactListResponse(
@@ -151,7 +153,7 @@ async def get_contacts(
             total=total,
             offset=offset,
             limit=limit,
-            has_more=offset + len(contacts) < total
+            has_more=offset + len(contacts) < total,
         )
 
     except HTTPException:
@@ -159,8 +161,7 @@ async def get_contacts(
     except Exception as e:
         logger.exception("Error fetching contacts")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch contacts: {str(e)}"
+            status_code=500, detail=f"Failed to fetch contacts: {str(e)}"
         )
 
 
@@ -188,8 +189,7 @@ async def get_contact_stats(
     except Exception as e:
         logger.exception("Error fetching contact statistics")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch statistics: {str(e)}"
+            status_code=500, detail=f"Failed to fetch statistics: {str(e)}"
         )
 
 
@@ -218,26 +218,26 @@ async def get_contact_by_id(
 
         if not contact:
             raise HTTPException(
-                status_code=404,
-                detail=f"Contact with ID {contact_id} not found"
+                status_code=404, detail=f"Contact with ID {contact_id} not found"
             )
 
-        return ContactResponse.from_orm(contact)
+        return ContactResponse.model_validate(contact)
 
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Error fetching contact %s", contact_id)
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch contact: {str(e)}"
+            status_code=500, detail=f"Failed to fetch contact: {str(e)}"
         )
 
 
 @router.get("/search", response_model=SearchResultsResponse)
 async def search_contacts(
     q: str = Query(..., description="Search query (name or phone number)"),
-    limit: int = Query(default=50, ge=1, le=100, description="Maximum results to return"),
+    limit: int = Query(
+        default=50, ge=1, le=100, description="Maximum results to return"
+    ),
     db: Session = Depends(get_db),
 ) -> SearchResultsResponse:
     """Search contacts by name or phone number.
@@ -262,20 +262,17 @@ async def search_contacts(
         HTTPException 500: If search fails
     """
     import time
+
     start_time = time.time()
 
     # Validate query
     query = q.strip()
     if not query:
-        raise HTTPException(
-            status_code=400,
-            detail="Search query cannot be empty"
-        )
+        raise HTTPException(status_code=400, detail="Search query cannot be empty")
 
     if len(query) < 2:
         raise HTTPException(
-            status_code=400,
-            detail="Search query must be at least 2 characters"
+            status_code=400, detail="Search query must be at least 2 characters"
         )
 
     try:
@@ -285,20 +282,28 @@ async def search_contacts(
         # Convert to response format
         search_results = []
         for result in results:
-            search_results.append(SearchResultItem(
-                id=str(result.contact.id),
-                display_name=result.contact.display_name,
-                given_name=result.contact.given_name,
-                family_name=result.contact.family_name,
-                phone_numbers=[
-                    PhoneNumberResponse.model_validate(p) for p in result.contact.phone_numbers
-                ],
-                email_addresses=[
-                    EmailAddressResponse.model_validate(e) for e in result.contact.email_addresses
-                ] if hasattr(result.contact, 'email_addresses') else [],
-                match_type=result.match_type,
-                match_field=result.match_field,
-            ))
+            search_results.append(
+                SearchResultItem(
+                    id=str(result.contact.id),
+                    display_name=result.contact.display_name,  # type: ignore[arg-type]
+                    given_name=result.contact.given_name,  # type: ignore[arg-type]
+                    family_name=result.contact.family_name,  # type: ignore[arg-type]
+                    phone_numbers=[
+                        PhoneNumberResponse.model_validate(p)
+                        for p in result.contact.phone_numbers
+                    ],
+                    email_addresses=(
+                        [
+                            EmailAddressResponse.model_validate(e)
+                            for e in result.contact.email_addresses
+                        ]
+                        if hasattr(result.contact, "email_addresses")
+                        else []
+                    ),
+                    match_type=result.match_type,
+                    match_field=result.match_field,
+                )
+            )
 
         elapsed_ms = (time.time() - start_time) * 1000
 
@@ -306,21 +311,18 @@ async def search_contacts(
             "Search for '%s' returned %d results in %.2fms",
             query,
             len(results),
-            elapsed_ms
+            elapsed_ms,
         )
 
         return SearchResultsResponse(
             results=search_results,
             count=len(results),
             query=query,
-            elapsed_ms=elapsed_ms
+            elapsed_ms=elapsed_ms,
         )
 
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Error performing search for query: %s", query)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Search failed: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")

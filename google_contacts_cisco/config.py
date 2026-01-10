@@ -54,7 +54,10 @@ class Settings(BaseSettings):
     sync_interval_minutes: int = 60  # Sync interval in minutes (min 5)
 
     # Timezone Settings
-    timezone: str = "UTC"  # Timezone for timestamp display (e.g., "America/New_York", "Europe/London")
+    timezone: str = (
+        "UTC"  # Timezone for timestamp display
+        # (e.g., "America/New_York", "Europe/London")
+    )
 
     # Search Settings
     search_results_limit: int = 50  # Max search results to return
@@ -147,18 +150,20 @@ class Settings(BaseSettings):
         """Validate timezone is a valid IANA timezone."""
         try:
             from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
             # Try to create a ZoneInfo object to validate the timezone
             ZoneInfo(v)
         except (ZoneInfoNotFoundError, OSError, KeyError):
             # If zoneinfo fails, fallback to UTC
             import logging
+
             logging.warning(
                 "Invalid timezone '%s', falling back to UTC. "
                 "Use IANA timezone names (e.g., 'America/New_York', 'Europe/London')",
-                v
+                v,
             )
             return "UTC"
-        
+
         return v
 
     @property

@@ -2,13 +2,15 @@
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Index
-from sqlalchemy.types import Uuid
+
+from sqlalchemy import Boolean, Column, DateTime, Index, String
 from sqlalchemy.orm import relationship
+from sqlalchemy.types import Uuid
+
 from . import Base
 
 
-class Contact(Base):
+class Contact(Base):  # type: ignore[misc, valid-type]
     """Contact model."""
 
     __tablename__ = "contacts"
