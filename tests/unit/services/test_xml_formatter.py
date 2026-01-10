@@ -911,6 +911,27 @@ class TestPhoneNumberFormattingForCisco(TestCiscoXMLFormatter):
         assert result == "180 0"
         assert result.replace(" ", "").isdigit()
 
+    def test_format_phone_with_extension_ext(self, formatter):
+        """Test phone number with ext extension is stripped."""
+        result = formatter._format_phone_for_cisco("(555) 123-4567 ext 123")
+        assert result == "555 123 4567"
+        assert "ext" not in result.lower()
+
+    def test_format_phone_with_extension_x(self, formatter):
+        """Test phone number with x extension is stripped."""
+        result = formatter._format_phone_for_cisco("+1-555-123-4567 x9")
+        assert result == "1 555 123 4567"
+
+    def test_format_phone_with_extension_word(self, formatter):
+        """Test phone number with extension word is stripped."""
+        result = formatter._format_phone_for_cisco("555-123-4567 extension 999")
+        assert result == "555 123 4567"
+
+    def test_format_phone_with_extension_dotted(self, formatter):
+        """Test phone number with ext. (dotted) is stripped."""
+        result = formatter._format_phone_for_cisco("555.123.4567 ext. 42")
+        assert result == "555 123 4567"
+
     def test_phone_formatting_in_contact_directory(self, formatter):
         """Test that phone formatting is applied in contact directory XML."""
         contact = Contact(
@@ -1020,20 +1041,20 @@ class TestPhoneNumberFormattingForCisco(TestCiscoXMLFormatter):
 
     def test_various_input_formats_normalize_same(self, formatter):
         """Test that various input formats normalize to same output."""
-        test_inputs = [
-            "+1-555-123-4567",
-            "+1 (555) 123-4567",
-            "1-555-123-4567",
-            "(555) 123-4567 ext 1",  # Extension info gets stripped
-            "15551234567",
-            "+15551234567",
+        test_cases = [
+            ("+1-555-123-4567", "1 555 123 4567"),
+            ("+1 (555) 123-4567", "1 555 123 4567"),
+            ("1-555-123-4567", "1 555 123 4567"),
+            ("+1-555-123-4567 ext 1", "1 555 123 4567"),  # Extension stripped
+            ("15551234567", "1 555 123 4567"),
+            ("+15551234567", "1 555 123 4567"),
         ]
 
-        expected = "1 555 123 4567"
-        for phone_input in test_inputs[:6]:  # Skip the extension one for this test
+        for phone_input, expected in test_cases:
             result = formatter._format_phone_for_cisco(phone_input)
-            if "ext" not in phone_input:
-                assert result == expected, f"Failed for input: {phone_input}"
+            assert (
+                result == expected
+            ), f"Failed for input: {phone_input}, got {result}, expected {expected}"
 
 
 class TestEdgeCases(TestCiscoXMLFormatter):

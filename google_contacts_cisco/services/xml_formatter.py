@@ -4,7 +4,8 @@ This module provides functionality to generate Cisco IP Phone XML format
 for directory menus, contact lists, and help screens.
 """
 
-from typing import TYPE_CHECKING, List
+import re
+from typing import TYPE_CHECKING, List, Optional
 
 from lxml import etree
 
@@ -202,20 +203,21 @@ class CiscoXMLFormatter:
 
         return self._to_xml_string(root)
 
-    def _format_phone_for_cisco(self, display_value: str) -> str:
+    def _format_phone_for_cisco(self, display_value: Optional[str]) -> str:
         """Format phone number for Cisco IP Phone display.
 
         Normalizes phone numbers to a consistent format compatible with
         Cisco IP Phone dialplan:
         - Removes + prefix (breaks Cisco dialplan)
         - Removes special characters (parentheses, dashes, dots)
+        - Strips extension suffixes (ext, x, extension)
         - Formats with spaces for readability
         - US/Canada 11-digit: "1 XXX XXX XXXX"
         - US/Canada 10-digit: "XXX XXX XXXX"
         - International: digits with spaces
 
         Args:
-            display_value: Original phone number display value
+            display_value: Original phone number display value (can be None)
 
         Returns:
             Formatted phone number suitable for Cisco phones
@@ -223,8 +225,17 @@ class CiscoXMLFormatter:
         if not display_value:
             return ""
 
+        # Strip whitespace
+        s = display_value.strip()
+
+        # Strip common extension suffixes before extracting digits
+        # This prevents extension digits from corrupting the dial string
+        s = re.sub(
+            r"\s*(?:ext\.?|x|extension)\s*\d+\s*$", "", s, flags=re.IGNORECASE
+        )
+
         # Extract only digits from the phone number
-        digits = "".join(c for c in display_value if c.isdigit())
+        digits = "".join(c for c in s if c.isdigit())
 
         if not digits:
             return ""
@@ -258,13 +269,13 @@ class CiscoXMLFormatter:
             result = digits[0:cc_len]
             remaining = digits[cc_len:]
 
-            # Group remaining digits in chunks of 3 or 4
+            # Group remaining digits in chunks of 3 (keep last chunk <= 4)
             while remaining:
                 if len(remaining) <= 4:
                     result += f" {remaining}"
                     break
                 else:
-                    chunk_size = 3 if len(remaining) > 4 else 2
+                    chunk_size = 3
                     result += f" {remaining[:chunk_size]}"
                     remaining = remaining[chunk_size:]
 
