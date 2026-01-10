@@ -91,34 +91,40 @@ class GooglePerson(BaseModel):
         """Get display name for contact.
 
         Tries multiple sources in order of preference:
-        1. The displayName field from the first name entry
-        2. Constructed from givenName + familyName
-        3. Just givenName
-        4. Just familyName
+        1. The displayName field from the first name entry (if non-empty after stripping)
+        2. Constructed from givenName + familyName (if both non-empty after stripping)
+        3. Just givenName (if non-empty after stripping)
+        4. Just familyName (if non-empty after stripping)
         5. First email address
-        6. Resource name as last resort
+        6. "Unnamed Contact" as last resort
 
         Returns:
-            Display name string, guaranteed to be non-empty
+            Display name string, guaranteed to be non-empty and not only whitespace
         """
         # Try names array first
         if self.names:
             name = self.names[0]
-            if name.display_name:
-                return name.display_name
-            elif name.given_name and name.family_name:
-                return f"{name.given_name} {name.family_name}"
-            elif name.given_name:
-                return name.given_name
-            elif name.family_name:
-                return name.family_name
+            if name.display_name and name.display_name.strip():
+                return name.display_name.strip()
+            
+            # Build from parts if available
+            given = name.given_name.strip() if name.given_name else None
+            family = name.family_name.strip() if name.family_name else None
+            
+            if given and family:
+                return f"{given} {family}"
+            elif given:
+                return given
+            elif family:
+                return family
 
         # Fall back to email
         if self.email_addresses:
             return self.email_addresses[0].value
 
-        # Last resort: resource name
-        return self.resource_name
+        # Last resort: "Unnamed Contact" instead of resource name
+        # Resource names like "people/c123" are not user-friendly
+        return "Unnamed Contact"
 
     def is_deleted(self) -> bool:
         """Check if contact is deleted.

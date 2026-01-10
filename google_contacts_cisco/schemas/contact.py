@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from ..utils.phone_utils import get_phone_normalizer
 
@@ -93,6 +93,24 @@ class ContactCreateSchema(BaseModel):
     job_title: Optional[str] = None
     phone_numbers: List[PhoneNumberSchema] = []
     deleted: bool = False
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, v: str) -> str:
+        """Validate that display_name is not empty or only whitespace.
+
+        Args:
+            v: The display_name value
+
+        Returns:
+            Validated display_name (stripped of leading/trailing whitespace)
+
+        Raises:
+            ValueError: If display_name is empty or only whitespace
+        """
+        if not v or not v.strip():
+            raise ValueError("display_name cannot be empty or only whitespace")
+        return v.strip()
 
 
 class ContactSchema(ContactCreateSchema):

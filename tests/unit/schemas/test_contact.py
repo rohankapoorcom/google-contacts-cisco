@@ -209,6 +209,75 @@ class TestContactCreateSchema:
         assert contact.phone_numbers == []
         assert contact.deleted is False
 
+    def test_display_name_strips_whitespace(self):
+        """Test that display_name strips leading/trailing whitespace."""
+        contact = ContactCreateSchema(
+            resource_name="people/c123",
+            display_name="  John Doe  ",
+        )
+
+        assert contact.display_name == "John Doe"
+
+    def test_display_name_empty_string_raises_error(self):
+        """Test that empty display_name raises validation error."""
+        with pytest.raises(ValidationError) as exc_info:
+            ContactCreateSchema(
+                resource_name="people/c123",
+                display_name="",
+            )
+
+        assert "display_name cannot be empty" in str(exc_info.value)
+
+    def test_display_name_whitespace_only_raises_error(self):
+        """Test that whitespace-only display_name raises validation error."""
+        with pytest.raises(ValidationError) as exc_info:
+            ContactCreateSchema(
+                resource_name="people/c123",
+                display_name="   ",
+            )
+
+        assert "display_name cannot be empty" in str(exc_info.value)
+
+    def test_display_name_tabs_only_raises_error(self):
+        """Test that tabs-only display_name raises validation error."""
+        with pytest.raises(ValidationError) as exc_info:
+            ContactCreateSchema(
+                resource_name="people/c123",
+                display_name="\t\t",
+            )
+
+        assert "display_name cannot be empty" in str(exc_info.value)
+
+    def test_display_name_newlines_only_raises_error(self):
+        """Test that newlines-only display_name raises validation error."""
+        with pytest.raises(ValidationError) as exc_info:
+            ContactCreateSchema(
+                resource_name="people/c123",
+                display_name="\n\n",
+            )
+
+        assert "display_name cannot be empty" in str(exc_info.value)
+
+    def test_display_name_mixed_whitespace_raises_error(self):
+        """Test that mixed whitespace-only display_name raises validation error."""
+        with pytest.raises(ValidationError) as exc_info:
+            ContactCreateSchema(
+                resource_name="people/c123",
+                display_name=" \t\n ",
+            )
+
+        assert "display_name cannot be empty" in str(exc_info.value)
+
+    def test_display_name_unicode_whitespace_raises_error(self):
+        """Test that Unicode whitespace-only display_name raises validation error."""
+        with pytest.raises(ValidationError) as exc_info:
+            ContactCreateSchema(
+                resource_name="people/c123",
+                display_name="\u00A0\u2003",  # Non-breaking space and em space
+            )
+
+        assert "display_name cannot be empty" in str(exc_info.value)
+
     def test_full_contact_creation(self):
         """Test creating a contact with all fields."""
         contact = ContactCreateSchema(

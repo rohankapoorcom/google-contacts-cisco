@@ -63,7 +63,7 @@ class TestTransformGooglePersonToContact:
         contact = transform_google_person_to_contact(person)
 
         assert contact.resource_name == "people/c123"
-        assert contact.display_name == "people/c123"  # Falls back to resource name
+        assert contact.display_name == "Unnamed Contact"  # Falls back to "Unnamed Contact"
         assert contact.given_name is None
         assert contact.family_name is None
         assert contact.organization is None

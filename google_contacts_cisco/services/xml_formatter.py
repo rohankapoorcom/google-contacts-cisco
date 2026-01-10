@@ -111,7 +111,9 @@ class CiscoXMLFormatter:
 
                 name = etree.SubElement(item, "Name")
                 # lxml handles XML escaping automatically when setting .text
-                name.text = contact.display_name or ""
+                # Defensive: ensure display_name is never empty
+                display = contact.display_name.strip() if contact.display_name else ""
+                name.text = display or "Unnamed Contact"
 
                 url = etree.SubElement(item, "URL")
                 url.text = f"{self.base_url}/directory/contacts/{contact.id}"
@@ -145,7 +147,9 @@ class CiscoXMLFormatter:
 
         # Title - lxml handles XML escaping automatically when setting .text
         title = etree.SubElement(root, "Title")
-        title.text = contact.display_name or ""
+        # Defensive: ensure display_name is never empty
+        display = contact.display_name.strip() if contact.display_name else ""
+        title.text = display or "Unnamed Contact"
 
         # Add phone numbers
         phone_numbers = getattr(contact, "phone_numbers", None) or []
@@ -217,10 +221,11 @@ class CiscoXMLFormatter:
         Returns:
             Group identifier (e.g., "2ABC", "0")
         """
-        if not contact.display_name:
+        # Defensive: handle empty or whitespace-only names
+        if not contact.display_name or not contact.display_name.strip():
             return "0"
 
-        first_char = contact.display_name[0].upper()
+        first_char = contact.display_name.strip()[0].upper()
 
         for group, chars in GROUP_MAPPINGS.items():
             if first_char in chars:
