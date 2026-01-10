@@ -125,7 +125,7 @@ def test_contacts(db_session, client):
     ]
 
     contacts = []
-    for name, resource_name in test_data:
+    for i, (name, resource_name) in enumerate(test_data):
         parts = name.split()
         contact = Contact(
             id=uuid.uuid4(),
@@ -136,6 +136,18 @@ def test_contacts(db_session, client):
             deleted=False,
         )
         db_session.add(contact)
+        db_session.flush()  # Flush to get contact.id for phone numbers
+
+        # Add a phone number to each contact so they appear in directory
+        phone = PhoneNumber(
+            id=uuid.uuid4(),
+            contact_id=contact.id,
+            type="mobile",
+            value=f"555{i:07d}",
+            display_value=f"(555) {i:03d}-{i:04d}",
+            primary=True,
+        )
+        db_session.add(phone)
         contacts.append(contact)
 
     db_session.commit()
@@ -690,4 +702,192 @@ class TestSpecialCharacters:
         # Should not raise XML parsing error
         root = etree.fromstring(response.content)
         assert root.tag == "CiscoIPPhoneDirectory"
+
+
+class TestContactsWithoutPhoneNumbersFiltered:
+    """Test that contacts without phone numbers are filtered from directory."""
+
+    def test_group_directory_excludes_contacts_without_phones(self, client, db_session):
+        """Test contacts without phone numbers don't appear in group directory."""
+        # Create contact WITH phone
+        contact_with_phone = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/withphone-{uuid.uuid4().hex[:8]}",
+            display_name="Alice FilterTest",
+            deleted=False,
+        )
+        db_session.add(contact_with_phone)
+        db_session.flush()
+
+        phone = PhoneNumber(
+            id=uuid.uuid4(),
+            contact_id=contact_with_phone.id,
+            type="mobile",
+            value="5551234567",
+            display_value="(555) 123-4567",
+            primary=True,
+        )
+        db_session.add(phone)
+
+        # Create contact WITHOUT phone
+        contact_no_phone = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/nophone-{uuid.uuid4().hex[:8]}",
+            display_name="Bob NoPhoneFilter",
+            deleted=False,
+        )
+        db_session.add(contact_no_phone)
+        db_session.commit()
+
+        # Request group directory (Alice starts with A = 2ABC)
+        response = client.get("/directory/groups/2ABC")
+        root = etree.fromstring(response.content)
+
+        menu_items = root.findall("MenuItem")
+        names = [item.find("Name").text for item in menu_items]
+
+        # Only contact with phone should appear
+        assert "Alice FilterTest" in names
+        assert "Bob NoPhoneFilter" not in names
+
+    def test_main_directory_still_accessible(self, client, db_session):
+        """Test main directory still works when contacts have no phones."""
+        # Create contact without phone
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/nophone-main-{uuid.uuid4().hex[:8]}",
+            display_name="Contact NoPhone Main",
+            deleted=False,
+        )
+        db_session.add(contact)
+        db_session.commit()
+
+        # Main directory should still load
+        response = client.get("/directory")
+        assert response.status_code == 200
+
+        root = etree.fromstring(response.content)
+        assert root.tag == "CiscoIPPhoneMenu"
+
+    def test_empty_group_when_no_contacts_with_phones(self, client, db_session):
+        """Test group shows empty message when no contacts have phones."""
+        # Create contact in 5JKL group (starts with J) but without phones
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/john-{uuid.uuid4().hex[:8]}",
+            display_name="John NoPhoneEmpty",
+            deleted=False,
+        )
+        db_session.add(contact)
+        db_session.commit()
+
+        response = client.get("/directory/groups/5JKL")
+        root = etree.fromstring(response.content)
+
+        menu_items = root.findall("MenuItem")
+        # Should show "(No contacts)" message
+        assert len(menu_items) == 1
+        assert "No contacts" in menu_items[0].find("Name").text
+
+    def test_multiple_contacts_mixed_phones(self, client, db_session):
+        """Test directory correctly filters in groups with mixed contacts."""
+        # Create several contacts in the same group (2ABC)
+        # Contact 1: with phone
+        contact1 = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/alice-{uuid.uuid4().hex[:8]}",
+            display_name="Aalice WithPhone",
+            deleted=False,
+        )
+        db_session.add(contact1)
+        db_session.flush()
+
+        phone1 = PhoneNumber(
+            id=uuid.uuid4(),
+            contact_id=contact1.id,
+            type="mobile",
+            value="5551111111",
+            display_value="(555) 111-1111",
+            primary=True,
+        )
+        db_session.add(phone1)
+
+        # Contact 2: without phone
+        contact2 = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/amy-{uuid.uuid4().hex[:8]}",
+            display_name="Aamy NoPhoneMix",
+            deleted=False,
+        )
+        db_session.add(contact2)
+
+        # Contact 3: with phone
+        contact3 = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/andrew-{uuid.uuid4().hex[:8]}",
+            display_name="Aandrew WithPhone",
+            deleted=False,
+        )
+        db_session.add(contact3)
+        db_session.flush()
+
+        phone3 = PhoneNumber(
+            id=uuid.uuid4(),
+            contact_id=contact3.id,
+            type="work",
+            value="5553333333",
+            display_value="(555) 333-3333",
+            primary=True,
+        )
+        db_session.add(phone3)
+
+        # Contact 4: without phone
+        contact4 = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/anna-{uuid.uuid4().hex[:8]}",
+            display_name="Aanna NoPhoneMix",
+            deleted=False,
+        )
+        db_session.add(contact4)
+        db_session.commit()
+
+        # Request group directory for 2ABC
+        response = client.get("/directory/groups/2ABC")
+        root = etree.fromstring(response.content)
+
+        menu_items = root.findall("MenuItem")
+        names = [item.find("Name").text for item in menu_items]
+
+        # Only contacts with phones should appear
+        assert "Aalice WithPhone" in names
+        assert "Aandrew WithPhone" in names
+        assert "Aamy NoPhoneMix" not in names
+        assert "Aanna NoPhoneMix" not in names
+
+    def test_contact_detail_still_shows_no_phone_message(self, client, db_session):
+        """Test individual contact view still handles contacts without phones.
+        
+        This ensures backward compatibility - if someone directly accesses
+        a contact without phones, they still get appropriate messaging.
+        """
+        # Create contact without phone
+        contact = Contact(
+            id=uuid.uuid4(),
+            resource_name=f"people/nophone-detail-{uuid.uuid4().hex[:8]}",
+            display_name="No Phone Detail Person",
+            deleted=False,
+        )
+        db_session.add(contact)
+        db_session.commit()
+
+        # Access contact directly
+        response = client.get(f"/directory/contacts/{contact.id}")
+        root = etree.fromstring(response.content)
+
+        # Should still show the contact with "No phone numbers" message
+        entries = root.findall("DirectoryEntry")
+        assert len(entries) == 1
+        name = entries[0].find("Name").text
+        assert "No phone" in name
+
 
