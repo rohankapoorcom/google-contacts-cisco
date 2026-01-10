@@ -322,14 +322,18 @@ class TestSearchContactsByPhone:
 
 
 class TestGetContact:
-    """Tests for /api/contacts/{contact_id} endpoint."""
+    """Tests for /api/contacts/{contact_id} endpoint.
+    
+    NOTE: This endpoint is now handled by contacts.py, not search_routes.py.
+    These tests verify the endpoint still works after the route was moved.
+    """
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_get_contact_success(self, mock_repo_class, client, sample_contact):
         """Should return contact by ID."""
         # Setup mocks
         mock_repo = Mock()
-        mock_repo.get_by_id.return_value = sample_contact
+        mock_repo.get_contact_by_id.return_value = sample_contact
         mock_repo_class.return_value = mock_repo
 
         # Make request
@@ -340,16 +344,15 @@ class TestGetContact:
         data = response.json()
         assert data["id"] == str(sample_contact.id)
         assert data["display_name"] == "John Doe"
-        assert "created_at" in data
         assert "updated_at" in data
         assert len(data["phone_numbers"]) == 1
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_get_contact_not_found(self, mock_repo_class, client):
         """Should return 404 for non-existent contact."""
         # Setup mocks
         mock_repo = Mock()
-        mock_repo.get_by_id.return_value = None
+        mock_repo.get_contact_by_id.return_value = None
         mock_repo_class.return_value = mock_repo
 
         # Make request
@@ -360,7 +363,7 @@ class TestGetContact:
         assert response.status_code == 404
         assert "not found" in response.json()["detail"]
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_get_contact_deleted(self, mock_repo_class, client):
         """Should return 404 for deleted contact."""
         # Setup mocks
@@ -375,7 +378,7 @@ class TestGetContact:
         deleted_contact.phone_numbers = []
 
         mock_repo = Mock()
-        mock_repo.get_by_id.return_value = deleted_contact
+        mock_repo.get_contact_by_id.return_value = deleted_contact
         mock_repo_class.return_value = mock_repo
 
         # Make request
@@ -391,9 +394,13 @@ class TestGetContact:
 
 
 class TestListContacts:
-    """Tests for /api/contacts (list) endpoint."""
+    """Tests for /api/contacts (list) endpoint.
+    
+    NOTE: This endpoint is now handled by contacts.py, not search_routes.py.
+    These tests verify the endpoint still works after the route was moved.
+    """
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_list_contacts_success(self, mock_repo_class, client, sample_contacts):
         """Should list all contacts with pagination."""
         # Setup mocks
@@ -405,15 +412,15 @@ class TestListContacts:
         # Make request
         response = client.get("/api/contacts")
 
-        # Assert
+        # Assert - now expects ContactListResponse format (contacts, total)
         assert response.status_code == 200
         data = response.json()
-        assert len(data["results"]) == 2
-        assert data["total_count"] == 2
-        assert data["limit"] == 50  # Default limit
+        assert len(data["contacts"]) == 2
+        assert data["total"] == 2
+        assert data["limit"] == 30  # Default limit from contacts.py
         assert data["offset"] == 0  # Default offset
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_list_contacts_with_pagination(
         self, mock_repo_class, client, sample_contacts
     ):
@@ -439,7 +446,7 @@ class TestListContacts:
             sort_by_recent=False,
         )
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_list_contacts_empty_result(self, mock_repo_class, client):
         """Should handle empty contact list."""
         # Setup mocks
@@ -451,11 +458,11 @@ class TestListContacts:
         # Make request
         response = client.get("/api/contacts")
 
-        # Assert
+        # Assert - now expects ContactListResponse format
         assert response.status_code == 200
         data = response.json()
-        assert len(data["results"]) == 0
-        assert data["total_count"] == 0
+        assert len(data["contacts"]) == 0
+        assert data["total"] == 0
         assert data["has_more"] is False
 
     def test_list_contacts_invalid_parameters(self, client):
@@ -558,12 +565,12 @@ class TestErrorHandling:
         assert response.status_code == 500
         assert "detail" in response.json()
 
-    @patch("google_contacts_cisco.api.search_routes.ContactRepository")
+    @patch("google_contacts_cisco.api.contacts.ContactRepository")
     def test_get_contact_repository_error(self, mock_repo_class, client):
         """Should handle repository errors."""
         # Setup mock to raise exception
         mock_repo = Mock()
-        mock_repo.get_by_id.side_effect = RuntimeError("Database error")
+        mock_repo.get_contact_by_id.side_effect = RuntimeError("Database error")
         mock_repo_class.return_value = mock_repo
 
         # Make request
