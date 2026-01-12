@@ -594,7 +594,7 @@ class TestRevokeCredentials:
 class TestGetAuthorizationUrl:
     """Test authorization URL generation."""
 
-    def test_get_authorization_url_returns_tuple(self, monkeypatch):
+    def test_get_authorization_url_returns_tuple(self, tmp_path, monkeypatch):
         """Should return a tuple of (url, state)."""
         mock_settings = Mock()
         mock_settings.google_client_id = "test_client_id"
@@ -603,6 +603,7 @@ class TestGetAuthorizationUrl:
         mock_settings.google_oauth_scopes = [
             "https://www.googleapis.com/auth/contacts.readonly"
         ]
+        mock_settings.token_path = tmp_path / "token.json"
         monkeypatch.setattr(oauth, "settings", mock_settings)
 
         url, state = get_authorization_url()
@@ -611,7 +612,7 @@ class TestGetAuthorizationUrl:
         assert isinstance(state, str)
         assert "accounts.google.com" in url
 
-    def test_get_authorization_url_includes_params(self, monkeypatch):
+    def test_get_authorization_url_includes_params(self, tmp_path, monkeypatch):
         """Should include required OAuth parameters in URL."""
         mock_settings = Mock()
         mock_settings.google_client_id = "test_client_id"
@@ -620,6 +621,7 @@ class TestGetAuthorizationUrl:
         mock_settings.google_oauth_scopes = [
             "https://www.googleapis.com/auth/contacts.readonly"
         ]
+        mock_settings.token_path = tmp_path / "token.json"
         monkeypatch.setattr(oauth, "settings", mock_settings)
 
         url, _ = get_authorization_url()
@@ -628,7 +630,7 @@ class TestGetAuthorizationUrl:
         assert "access_type=offline" in url
         assert "prompt=consent" in url
 
-    def test_get_authorization_url_with_custom_state(self, monkeypatch):
+    def test_get_authorization_url_with_custom_state(self, tmp_path, monkeypatch):
         """Should use provided state parameter."""
         mock_settings = Mock()
         mock_settings.google_client_id = "test_client_id"
@@ -637,6 +639,7 @@ class TestGetAuthorizationUrl:
         mock_settings.google_oauth_scopes = [
             "https://www.googleapis.com/auth/contacts.readonly"
         ]
+        mock_settings.token_path = tmp_path / "token.json"
         monkeypatch.setattr(oauth, "settings", mock_settings)
 
         url, state = get_authorization_url(state="/dashboard")
@@ -660,6 +663,12 @@ class TestHandleOAuthCallback:
         mock_settings.token_path = tmp_path / "token.json"
         monkeypatch.setattr(oauth, "settings", mock_settings)
 
+        from google_contacts_cisco.auth.oauth import _save_state
+
+        # Save a valid state
+        state = "valid_state_123"
+        _save_state(state)
+
         mock_creds = _create_mock_credentials()
 
         mock_flow = Mock()
@@ -668,14 +677,14 @@ class TestHandleOAuthCallback:
         with patch(
             "google_contacts_cisco.auth.oauth.get_oauth_client", return_value=mock_flow
         ):
-            result = handle_oauth_callback(
-                "http://localhost:8000/auth/callback?code=test_code"
+            result, custom_data = handle_oauth_callback(
+                f"http://localhost:8000/auth/callback?code=test_code&state={state}"
             )
 
         assert result is not None
         mock_flow.fetch_token.assert_called_once()
 
-    def test_handle_oauth_callback_exchange_failure(self, monkeypatch):
+    def test_handle_oauth_callback_exchange_failure(self, tmp_path, monkeypatch):
         """Should raise TokenExchangeError when exchange fails."""
         mock_settings = Mock()
         mock_settings.google_client_id = "test_client_id"
@@ -684,7 +693,14 @@ class TestHandleOAuthCallback:
         mock_settings.google_oauth_scopes = [
             "https://www.googleapis.com/auth/contacts.readonly"
         ]
+        mock_settings.token_path = tmp_path / "token.json"
         monkeypatch.setattr(oauth, "settings", mock_settings)
+
+        from google_contacts_cisco.auth.oauth import _save_state
+
+        # Save a valid state
+        state = "valid_state_123"
+        _save_state(state)
 
         mock_flow = Mock()
         mock_flow.fetch_token.side_effect = Exception("Exchange failed")
@@ -694,7 +710,7 @@ class TestHandleOAuthCallback:
         ):
             with pytest.raises(TokenExchangeError) as exc_info:
                 handle_oauth_callback(
-                    "http://localhost:8000/auth/callback?code=invalid_code"
+                    f"http://localhost:8000/auth/callback?code=invalid_code&state={state}"
                 )
 
         assert "Exchange failed" in str(exc_info.value)
